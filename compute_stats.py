@@ -81,5 +81,22 @@ if __name__ == '__main__':
     pprint.pprint(ComputeWinningStatsByHomeworld(games))
     print
     print
-    pprint.pprint(ComputeWinningStatsByCardPlayed(games))
+    card_info = list(csv.DictReader(open('card_attributes.csv', 'r')))
+    dev_6_names = [card['Name'] for card in card_info if card['Cost'] == '6' and
+                   card['Type'] == 'Development']
+
+    winning_stats_by_cards = ComputeWinningStatsByCardPlayed(games)
+    dev_6_stats = []
+    for by_card_stats in winning_stats_by_cards:
+        if by_card_stats[0] in dev_6_names:
+            dev_6_stats.append(by_card_stats)
+
+    def Utility(card_stat):
+        # Just some approximate way to measure how good a card performed.
+        # The first term is how much your winning rate increases from the 
+        # baseline, given that it was played.  It's given a bit more weight
+        # than the second term, which is basically how often the card is played.
+        return -(card_stat[1] - 1.0) * card_stat[2] ** .5
+    dev_6_stats.sort(key=Utility)
+    pprint.pprint(dev_6_stats)
     
