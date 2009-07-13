@@ -76,16 +76,20 @@ def ComputeWinningStatsByBucket(games, bucketter):
 
 if __name__ == '__main__':
     games = eval(open('condensed_games.json').read())
-    games = [g for g in games if len(g['player_list']) >= 2 and g['expansion']]
+    games = [g for g in games if len(g['player_list']) == 2]
+             
+
     print 'analyzing', len(games), 'games'
     pprint.pprint(ComputeWinningStatsByHomeworld(games))
     print
     print
+
     card_info = list(csv.DictReader(open('card_attributes.csv', 'r')))
     dev_6_names = [card['Name'] for card in card_info if card['Cost'] == '6' and
                    card['Type'] == 'Development']
 
     winning_stats_by_cards = ComputeWinningStatsByCardPlayed(games)
+    pprint.pprint(winning_stats_by_cards)
     dev_6_stats = []
     for by_card_stats in winning_stats_by_cards:
         if by_card_stats[0] in dev_6_names:
