@@ -48,7 +48,7 @@ def ParseGame(page_contents, card_info):
     #print 'using goals?', using_goals
     ret = {'player_list': [], 
            'game_no': int(GAME_NUM_RE.search(version_with_context).group(1)),
-           'is_exp': int(is_exp)}
+           'expansion': int(is_exp)}
 
     if 'Status:' not in page_contents:
         #print 'could not find status'
@@ -89,8 +89,8 @@ def ParseGame(page_contents, card_info):
             goals.update(won_goals)
             player_result['goals'] = won_goals
         ret['player_list'].append(player_result)
-    ret['expansion'] = int(is_exp)
-    ret['goals'] = list(goals)
+    if using_goals:
+        ret['goals'] = list(goals)
     return ret
 
 if __name__ == '__main__':
