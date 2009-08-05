@@ -11,7 +11,7 @@ def GameComplete(file_name):
                                            MockInfo()) != None
 
 if __name__ == '__main__':
-    for i in range(5459, 7500):
+    for i in range(7500, 8200):
         try:
             url_name = 'game.htm?gid=%d' % i
             url = 'http://genie.game-host.org/' + url_name

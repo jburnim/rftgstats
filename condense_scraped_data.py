@@ -4,6 +4,8 @@ import csv
 import pprint
 import os.path
 import re
+import simplejson as json
+import gzip
 
 ALL_DIGITS = re.compile('\d+')
 POINTS_RE = re.compile('points = (-?\d+)p')
@@ -127,7 +129,6 @@ def ParseGame(page_contents, card_info):
     return ret
 
 if __name__ == '__main__':
-
     card_info = csv.DictReader(open('card_names.csv', 'r'))
     cards_by_id = {}
     for row in card_info:
@@ -156,5 +157,5 @@ if __name__ == '__main__':
 
     print 'games with errors', error_sources
     print 'games with known errors', known_errors
-    #print games
-    pprint.pprint(games, open('condensed_games.json', 'w'))
+    json.dump(games, open('condensed_games.json', 'w'), indent=True)
+    json.dump(games, gzip.GzipFile('condensed_games.json.gz', 'w'))

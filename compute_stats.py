@@ -10,6 +10,19 @@ HOMEWORLDS = ["Alpha Centauri", "Epsilon Eridani", "Old Earth",
               "Earth's Lost Colony", "New Sparta",
               "Separatist Colony", "Doomed world"]
 
+GOALS = [ 
+    '4+ Production',
+    '4+ Devs',
+    '6+ Military',
+    '3+ Blue/Brown',
+    '5 VP',
+    'First 6 Dev',
+    'All Abilities',
+    'First Discard',
+    'All Colors',
+    '3 Aliens',
+    ]
+
 def Homeworld(player_info):
     # This misclassifes initial doomed world settles that are other homeworlds.
     # I doubt that happens all that often though.
@@ -36,24 +49,28 @@ class AccumDict:
         return self._accum[key]
 
 def ComputeWinningStatsByHomeworld(games):
-    def HomeworldYielder(player_result):
+    def HomeworldYielder(player_result, game):
         yield Homeworld(player_result)
     return ComputeWinningStatsByBucket(games, HomeworldYielder)
 
 def ComputeWinningStatsByCardPlayed(games):
-    def CardYielder(player_result):
+    def CardYielder(player_result, game):
         for card in player_result['cards']:
             yield card
     return ComputeWinningStatsByBucket(games, CardYielder)
 
 
 def ComputeWinningStatsByPlayer(games):
-    def PlayerYielder(player_result):
+    def PlayerYielder(player_result, game):
         yield player_result['name']
     return ComputeWinningStatsByBucket(games, PlayerYielder)
 
+def Score(result):
+    return result['points'] * 100 + result['goods'] + result['hand'] 
+
 def WinningScore(game):
-    return max(result['points'] for result in game['player_list'])
+    return max(Score(result) for result in game['player_list'])
+        
 
 def ComputeWinningStatsByBucket(games, bucketter):
     wins = AccumDict()
@@ -65,14 +82,14 @@ def ComputeWinningStatsByBucket(games, bucketter):
 
         num_winning_players = 0
         for player_result in game['player_list']:
-            if player_result['points'] == max_score:
+            if Score(player_result) == max_score:
                 num_winning_players += 1
         inv_num_winners = 1.0 / num_winning_players
 
         for player_result in game['player_list']:
-            for bucket in bucketter(player_result):
+            for bucket in bucketter(player_result, game):
                 exp_wins.Add(bucket, inv_num_players)
-                if player_result['points'] == max_score:
+                if Score(player_result) == max_score:
                     wins.Add(bucket, inv_num_winners)
 
     win_rates = []
@@ -88,7 +105,7 @@ def GameTied(game):
 
 def GameWinners(game):
     max_score = WinningScore(game)
-    return [p for p in game['player_list'] if p['points'] == max_score]
+    return [p for p in game['player_list'] if Score(p) == max_score]
 
 def FilterOutTies(games):
     return [g for g in games if not GameTied(g)]
@@ -157,7 +174,7 @@ def EloProbability(r1, r2):
     return 1 / (1 + 10 ** ((r1 - r2) / 400.0))
 
 def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
-    def CardSkillYielder(player_result):
+    def CardSkillYielder(player_result, game):
         skill_info = skill_ratings.GetSkillInfo(player_result['name'])
         for card in player_result['cards']:
             yield card, skill_info.rating, skill_info.wins, skill_info.exp_wins
@@ -195,6 +212,43 @@ def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
         del card_stats['wins']
 
     return grouped_by_card
+
+def FilterOutNonGoals(games):
+    return [g for g in games if 'goals' in g]
+
+def ComputeWinningStatsByHomeworldGoal(games):
+    games = FilterOutNonGoals(games)
+    print 'total games with goals analyzed', len(games)
+    def HomeworldGoalYielder(player_result, game):
+        for goal in game['goals']:
+            yield Homeworld(player_result), goal
+    bucketted_by_homeworld_goal = ComputeWinningStatsByBucket(
+        games, HomeworldGoalYielder)
+    keyed_by_homeworld_goal = {}
+    for (homeworld, goal), win_rate, exp_wins in bucketted_by_homeworld_goal:
+        keyed_by_homeworld_goal[(homeworld, goal)] = win_rate
+        
+    HOMEWORLD_SPACE = 25
+    PER_NUM_SPACE = 8
+    print ''.ljust(HOMEWORLD_SPACE + PER_NUM_SPACE),
+    for goal in GOALS[::2]:
+        print goal.ljust(PER_NUM_SPACE * 2 + 1),
+    print
+
+    print ''.ljust(HOMEWORLD_SPACE + PER_NUM_SPACE * 2),
+    for goal in GOALS[1::2]:
+        print goal.ljust(PER_NUM_SPACE * 2 + 1),
+    print
+    
+    bucketted_by_homeworld = ComputeWinningStatsByHomeworld(games)
+    for homeworld, win_rate, exp_wins in bucketted_by_homeworld:
+        print homeworld.ljust(HOMEWORLD_SPACE), ('%.3f' % win_rate).ljust(PER_NUM_SPACE),
+        
+        for goal in GOALS:
+            diff_as_str = '%.3f' % (
+                (keyed_by_homeworld_goal[(homeworld, goal)] - win_rate))
+            print diff_as_str.ljust(PER_NUM_SPACE),
+        print
         
 
 def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings):
@@ -224,7 +278,8 @@ def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings):
     
 if __name__ == '__main__':
     games = eval(open('condensed_games.json').read())
-    games = [g for g in games if len(g['player_list']) >= 2 and g['expansion']]
+    games = [g for g in games if g['expansion']]
+
 
     print 'analyzing', len(games), 'games'
     #pprint.pprint(ComputeWinningStatsByHomeworld(games))
@@ -273,5 +328,5 @@ if __name__ == '__main__':
                 ('%.2f' % info['player_win_rate']).ljust(10), 
                 ('%.2f' % info['win_rate']).ljust(10))
                 
-
+    pprint.pprint(ComputeWinningStatsByHomeworldGoal(games))
     
