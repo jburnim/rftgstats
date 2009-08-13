@@ -278,7 +278,7 @@ def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings):
     
 if __name__ == '__main__':
     games = eval(open('condensed_games.json').read())
-    games = [g for g in games if g['expansion']]
+    games = FilterOutNonGoals(games)
 
 
     print 'analyzing', len(games), 'games'
