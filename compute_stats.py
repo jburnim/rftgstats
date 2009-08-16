@@ -4,6 +4,7 @@ import pprint
 import sys
 import csv
 import math
+import collections
 
 HOMEWORLDS = ["Alpha Centauri", "Epsilon Eridani", "Old Earth",
               "Ancient Race", "Damaged Alien Factory",
@@ -110,16 +111,33 @@ def GameWinners(game):
 def FilterOutTies(games):
     return [g for g in games if not GameTied(g)]
 
+def GetPlayerResultForName(game, player_name):
+    for player in game['player_list']:
+	if player['name'] == player_name:
+	    return player
+
 class PlayerSkillInfo:
     def __init__(self, rating, wins, exp_wins):
         self.rating = rating
         self.wins = wins
         self.exp_wins = exp_wins
 
+class PlayerInfo:
+    def __init__(self):
+	pass
+
+    def SetRatingFlowByOpponent(rating_flow):
+	self.rating_flow_by_opponent = rating_flow
+
+    def SetRatingFlowByHomeworld(rating_flow):
+	self._rating_flow_by_homeworld = rating_flow
+
 class SkillRatings:
     def __init__(self, games, prob_func, base_rating, move_const):
         self.ratings = {}
         self.base_rating = base_rating
+	self.rating_flow = collections.defaultdict(lambda: collections.defaultdict(int))
+	self.rating_by_homeworld_flow = collections.defaultdict(lambda: collections.defaultdict(int))
 
         for game in FilterOutTies(games):
             winner = GameWinners(game)[0]
@@ -133,18 +151,31 @@ class SkillRatings:
                 loser_rating = self.GetSkillInfo(loser_name).rating
                 win_prob = prob_func(winner_rating, loser_rating)
                 lose_prob = 1.0 - win_prob
-                delta[win_name] = delta[win_name] + lose_prob * move_const
+                delta[win_name] = delta[win_name] + win_prob * move_const
                 delta[loser_name] = -win_prob * move_const
             for player_name in delta:
                 self.ratings[player_name].rating += delta[player_name]
                 self.ratings[player_name].exp_wins += 1.0 / (
                     len(game['player_list']))
+
+		self.rating_flow[win_name][player_name] -= delta[player_name]
+		self.rating_flow[player_name][win_name] += delta[player_name]
+
+		self.rating_by_homeworld_flow[player_name][Homeworld(
+			GetPlayerResultForName(game, win_name))] += delta[player_name]
+
             self.ratings[win_name].wins += 1.0
+
+    def GetHomeworldSkillFlow(self, name):
+	return self.rating_by_homeworld_flow[name]
 
     def GetSkillInfo(self, name):
         if name not in self.ratings:
             self.ratings[name] = PlayerSkillInfo(self.base_rating, 0, 0)
         return self.ratings[name]
+
+    def GetRatingFlow(self, name):
+	return str(self.rating_flow[name]) + ' ' + str(sum(self.rating_flow[name].values()))
 
     def ComputeRatingBuckets(self, games, num_buckets):
         skills_weighted_by_games = []
@@ -306,6 +337,10 @@ if __name__ == '__main__':
     #pprint.pprint(dev_6_stats)
 
     skill_ratings = SkillRatings(games, EloProbability, 1500, 10)
+    print skill_ratings.GetRatingFlow( 'rrenaud' ) , '\n\n'
+    print skill_ratings.GetHomeworldSkillFlow( 'rrenaud' ) , '\n\n'
+    print skill_ratings.GetSkillInfo( 'rrenaud' ).rating
+
     #win_stats_by_homeworld_skill_level = ComputeWinStatsByHomeworldSkillLevel(
     #    games, skill_ratings)
     #pprint.pprint(win_stats_by_homeworld_skill_level)
