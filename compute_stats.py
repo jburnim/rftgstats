@@ -4,6 +4,8 @@ import pprint
 import sys
 import csv
 import math
+import random
+import os
 import collections
 
 HOMEWORLDS = ["Alpha Centauri", "Epsilon Eridani", "Old Earth",
@@ -39,7 +41,7 @@ class AccumDict:
     def Add(self, key, val):
         if key not in self._accum:
             self._accum[key] = 0.0
-        self._accum[key] = self._accum[key] + val
+        self._accum[key] += val
 
     def __getattr__(self, key):
         return getattr(self._accum, key)
@@ -60,6 +62,45 @@ def ComputeWinningStatsByCardPlayed(games):
             yield card
     return ComputeWinningStatsByBucket(games, CardYielder)
 
+def ComputeWinningStatsByCardPlayedAndPlayer(games):
+    def PlayerCardYielder(player_result, game):
+        for card in player_result['cards']:
+            yield player_result['name'], card
+    return ComputeWinningStatsByBucket(games, PlayerCardYielder)
+
+class PlayerCardAffinity:
+    def __init__(self, games):
+        self.baseline_card_info = ComputeWinningStatsByCardPlayed(games)
+        player_card_info = ComputeWinningStatsByCardPlayedAndPlayer(games)
+        rekeyed_player_card_info = collections.defaultdict(lambda: (0.0, 0.0))
+        for player_card, card_win_ratio, card_exp_wins in player_card_info:
+            rekeyed_player_card_info[player_card] = (card_win_ratio,
+                                                     card_exp_wins)
+        self.player_card_info = rekeyed_player_card_info
+            
+        self.num_games_by_player = collections.defaultdict(float)
+        for game in games:
+            for player_result in game['player_list']:
+                self.num_games_by_player[player_result['name']] += 1
+
+        self.num_games = float(len(games))
+        
+    def PlayerVsBaseCardInfo(self, player_name):
+        card_diff_info = []
+        for card_name, card_win_ratio, card_exp_wins in self.baseline_card_info:
+            player_card_win_ratio, player_card_exp_wins = self.player_card_info[
+                (player_name, card_name)]
+            win_ratio_diff = player_card_win_ratio - card_win_ratio
+
+            overall_play_ratio = card_exp_wins / self.num_games # wrong
+            player_play_ratio = player_card_exp_wins / self.num_games_by_player[
+                player_name] # also wrong
+
+            play_ratio_diff = player_play_ratio - overall_play_ratio
+            card_diff_info.append((card_name, win_ratio_diff, play_ratio_diff))
+        card_diff_info.sort(key = lambda x: x[1])
+        return card_diff_info
+        
 
 def ComputeWinningStatsByPlayer(games):
     def PlayerYielder(player_result, game):
@@ -74,6 +115,8 @@ def WinningScore(game):
         
 
 def ComputeWinningStatsByBucket(games, bucketter):
+    """ Returns a list of (bucket_key, win_ratio, exp_wins),
+    sorted by win_ratio"""
     wins = AccumDict()
     exp_wins = AccumDict()
     for game in games:
@@ -122,6 +165,9 @@ class PlayerSkillInfo:
         self.wins = wins
         self.exp_wins = exp_wins
 
+    def __repr__(self):
+        return str(self.rating)
+
 class PlayerInfo:
     def __init__(self):
 	pass
@@ -132,12 +178,17 @@ class PlayerInfo:
     def SetRatingFlowByHomeworld(rating_flow):
 	self._rating_flow_by_homeworld = rating_flow
 
+def SortDictByKeys(d):
+    return sorted(d.items(), key = lambda x: -x[1])
+
 class SkillRatings:
     def __init__(self, games, prob_func, base_rating, move_const):
         self.ratings = {}
         self.base_rating = base_rating
-	self.rating_flow = collections.defaultdict(lambda: collections.defaultdict(int))
-	self.rating_by_homeworld_flow = collections.defaultdict(lambda: collections.defaultdict(int))
+	self.rating_flow = collections.defaultdict(
+            lambda: collections.defaultdict(int))
+	self.rating_by_homeworld_flow = collections.defaultdict(
+            lambda: collections.defaultdict(int))
 
         for game in FilterOutTies(games):
             winner = GameWinners(game)[0]
@@ -158,16 +209,21 @@ class SkillRatings:
                 self.ratings[player_name].exp_wins += 1.0 / (
                     len(game['player_list']))
 
-		self.rating_flow[win_name][player_name] -= delta[player_name]
-		self.rating_flow[player_name][win_name] += delta[player_name]
+                homeworld = Homeworld(GetPlayerResultForName(game, win_name))
 
-		self.rating_by_homeworld_flow[player_name][Homeworld(
-			GetPlayerResultForName(game, win_name))] += delta[player_name]
+		self.rating_by_homeworld_flow[player_name][homeworld] += (
+                    delta[player_name])
+
+                if win_name == player_name:
+                    continue
+                self.rating_flow[win_name][player_name] -= delta[player_name]
+                self.rating_flow[player_name][win_name] += delta[player_name]
+
 
             self.ratings[win_name].wins += 1.0
 
     def GetHomeworldSkillFlow(self, name):
-	return self.rating_by_homeworld_flow[name]
+	return SortDictByKeys(self.rating_by_homeworld_flow[name])
 
     def GetSkillInfo(self, name):
         if name not in self.ratings:
@@ -175,7 +231,10 @@ class SkillRatings:
         return self.ratings[name]
 
     def GetRatingFlow(self, name):
-	return str(self.rating_flow[name]) + ' ' + str(sum(self.rating_flow[name].values()))
+        return SortDictByKeys(self.rating_flow[name])
+
+    def PlayersSortedBySkill(self):
+        return sorted(self.ratings.items(), key = lambda x: -x[1].rating) 
 
     def ComputeRatingBuckets(self, games, num_buckets):
         skills_weighted_by_games = []
@@ -244,6 +303,25 @@ def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
 
     return grouped_by_card
 
+def NiceFormatWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
+    win_stats_by_card_skill = ComputeWinningStatsByCardPlayedAndSkillLevel(
+        games, skill_ratings)
+    win_stats_by_card_skill = win_stats_by_card_skill.items()
+    keys = ['win_rate']
+    for key_name in keys:
+        win_stats_by_card_skill.sort(key = lambda x: -x[1][key_name])
+        print '\nsorted by', key_name
+        print '%s%s%s%s%s' % ('card_name'.ljust(30), 'avgrat'.ljust(10),
+                              'E[win]'.ljust(10), 'p_win_r'.ljust(10),
+                              'w_rate'.ljust(10))
+        for card, info in win_stats_by_card_skill:
+            print '%s%s%s%s%s' % (
+                card.ljust(30), 
+                ('%.0f' % info['avg_rating']).ljust(10), 
+                ('%.2f' % info['exp_wins']).ljust(10), 
+                ('%.2f' % info['player_win_rate']).ljust(10), 
+                ('%.2f' % info['win_rate']).ljust(10))
+
 def FilterOutNonGoals(games):
     return [g for g in games if 'goals' in g]
 
@@ -306,15 +384,8 @@ def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings):
         for i in range(NUM_SKILL_BUCKETS):
             ret[homeworld].append(keyed_by_bucket[(homeworld, i)])
     return ret
-    
-if __name__ == '__main__':
-    games = eval(open('condensed_games.json').read())
-    games = FilterOutNonGoals(games)
 
-
-    print 'analyzing', len(games), 'games'
-    #pprint.pprint(ComputeWinningStatsByHomeworld(games))
-
+def SixDevRankings(games):
     card_info = list(csv.DictReader(open('card_attributes.csv', 'r')))
     dev_6_names = [card['Name'] for card in card_info if card['Cost'] == '6' and
                    card['Type'] == 'Development']
@@ -333,35 +404,140 @@ if __name__ == '__main__':
         # baseline, given that it was played.  It's given a bit more weight
         # than the second term, which is basically how often the card is played.
         return -(card_stat[1] - 1.0) * card_stat[2] ** .5
+
     dev_6_stats.sort(key=Utility)
     #pprint.pprint(dev_6_stats)
 
-    skill_ratings = SkillRatings(games, EloProbability, 1500, 10)
-    print skill_ratings.GetRatingFlow( 'rrenaud' ) , '\n\n'
-    print skill_ratings.GetHomeworldSkillFlow( 'rrenaud' ) , '\n\n'
-    print skill_ratings.GetSkillInfo( 'rrenaud' ).rating
+class OverviewStats:
+    def __init__(self, games):
+        self.max_game_no = 0
+        self.games_played = len(games)
+        player_size = collections.defaultdict(int)
+        race_type = collections.defaultdict(int)
 
-    #win_stats_by_homeworld_skill_level = ComputeWinStatsByHomeworldSkillLevel(
-    #    games, skill_ratings)
-    #pprint.pprint(win_stats_by_homeworld_skill_level)
+        for game in games:
+            self.max_game_no = max(self.max_game_no, game['game_no'])
+            adv = ''
+            if game['advanced'] == 1:
+                adv = ' adv'
+            
+            players_size_str = '%dp%s' % ( len(game['player_list']), adv )
+            player_size[players_size_str] += 1
 
-    win_stats_by_card_skill = ComputeWinningStatsByCardPlayedAndSkillLevel(
-        games, skill_ratings)
-    win_stats_by_card_skill = win_stats_by_card_skill.items()
-    keys = ['win_rate']
-    for key_name in keys:
-        win_stats_by_card_skill.sort(key = lambda x: -x[1][key_name])
-        print '\nsorted by', key_name
-        print '%s%s%s%s%s' % ('card_name'.ljust(30), 'avgrat'.ljust(10),
-                              'E[win]'.ljust(10), 'p_win_r'.ljust(10),
-                              'w_rate'.ljust(10))
-        for card, info in win_stats_by_card_skill:
-            print '%s%s%s%s%s' % (
-                card.ljust(30), 
-                ('%.0f' % info['avg_rating']).ljust(10), 
-                ('%.2f' % info['exp_wins']).ljust(10), 
-                ('%.2f' % info['player_win_rate']).ljust(10), 
-                ('%.2f' % info['win_rate']).ljust(10))
-                
-    pprint.pprint(ComputeWinningStatsByHomeworldGoal(games))
+            race_type_str = 'Base'
+            if game['expansion'] == 1:
+                race_type_str = 'Gathering Storm'
+            if 'goals' in game['player_list'][0]:
+                race_type_str += ' with Goals'
+
+            race_type[race_type_str] += 1
+
+        self.player_size = player_size.items()
+        self.player_size.sort()
+        self.race_type = race_type.items()
+        self.race_type.sort()
+
+    def RenderAsHTMLTable(self):
+        header_fmt = '<table border=1><tr><td>%s</td><td>Num Games' + (
+            '</td><td>Percentage</td></tr>')
+        html = '<a name="overview">Last seen game %d<br>' % self.max_game_no
+        html += header_fmt % 'Player Size'
+        for size in self.player_size:
+            html += '<tr><td>%s</td><td>%d</td><td>%d%%</td></tr>' % (
+                ( size[0], size[1], int( 100. * size[1] / self.games_played )))
+        html += '</table border=1><table>'
+        html += header_fmt % 'Game Type'
+        for d in self.race_type:
+            html += '<tr><td>%s</td><td>%d</td><td>%d%%</td></tr>' % (
+                ( d[0], d[1], int( 100. * d[1] / self.games_played )))
+        html += '</table>'
+        return html
+
+def PlayerFile(player_name):
+    return 'player_' + player_name + '.html'
+
+def PlayerLink(player_name):
+    return '<a href="' + PlayerFile(player_name) + '">' + player_name + '</a>'
+
+def RenderTopPage(games, skill_ratings):
+    overview = OverviewStats(games)
+    top_out = open('output/index.html', 'w')
     
+    top_out.write('<html><head><title>Genie Overview Stats</title><head>\n')
+    top_out.write('<body>' + overview.RenderAsHTMLTable())
+
+    top_out.write('<table border=1>')
+
+    player_by_skill = skill_ratings.PlayersSortedBySkill()
+    top_out.write('Total players %d\n' % len(player_by_skill))
+    top_out.write('<tr><td>Rank</td><td>Player Name</td><td>Rating</td></tr>\n')
+    for ind, (player_name, skill_info) in enumerate(player_by_skill):
+        top_out.write('<tr><td>%d</td><td>%s</td><td>%.0f</td></tr>\n' %
+                      (ind + 1, PlayerLink(player_name), skill_info.rating))
+    top_out.write('</table')
+
+    top_out.write('</body></html>')
+
+def PlayerToGameList(games):
+    players_to_games = collections.defaultdict(list)
+    for game in games:
+        for player in game['player_list']:
+            players_to_games[player['name']].append(game)
+    return players_to_games
+
+def WritePlayerFloatPairsAsTableRows(output_file, pairs):
+    for s, f in pairs:
+        output_file.write('<tr><td>%s</td><td>%.1f</td></tr>\n' % (s, f))
+
+def RenderPlayerPage(player, player_games, skill_ratings):
+    overview = OverviewStats(player_games)
+    player_out = open('output/' + PlayerFile(player), 'w')
+    player_out.write('<html><head><title>Genie Statistics for player %s'
+                     '<title></head><body>\n' % player)
+
+    player_out.write('<a href="#overview">Overview</a>\n' 
+                     '<a href="#homeworld_flow">Homeworld Rating Flow</a>'
+                     '<a href="#player_flow">Player Rating Flow</a>\n' 
+                     '<br>\n')
+    player_out.write(overview.RenderAsHTMLTable())
+
+    player_out.write('<a name="homeworld_flow"> '
+                     '<table border=1><tr><td>Homeworld</td>'
+                     '<td>Net rating change when playing<td></tr>')
+    WritePlayerFloatPairsAsTableRows(
+        player_out, skill_ratings.GetHomeworldSkillFlow(player))
+    player_out.write('</table>')
+
+    player_out.write('<a name="player_flow"> '
+                     '<table border=1><tr><td>Opponent</td>'
+                     '<td>Net rating flow</td></tr>\n')
+    linked_out = [(PlayerLink(o), s) for o, s in
+                  skill_ratings.GetRatingFlow(player)]
+    WritePlayerFloatPairsAsTableRows(player_out, linked_out)
+    player_out.write('</table>')
+
+
+
+    player_out.write('</html>')
+
+def main():
+    games = eval(open('condensed_games.json').read())
+    #games = eval(open('terse_games.json').read())
+    #open('terse_games.json', 'w').write(str(random.sample(games, 100)))
+        
+    skill_ratings = SkillRatings(games, EloProbability, 1500, 15)
+    # #     print skill_ratings.GetSkillInfo( 'rrenaud' ).rating
+    #NiceFormatWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings)
+
+    #     player_card_info = PlayerCardAffinity(games)
+    #     pprint.pprint(player_card_info.PlayerVsBaseCardInfo('Danny'))
+    if not os.access('output', os.O_RDONLY):
+        os.mkdir('output')
+    RenderTopPage(games, skill_ratings)
+
+    for player, player_games in PlayerToGameList(games).iteritems():
+        RenderPlayerPage(player, player_games, skill_ratings)
+
+if __name__ == '__main__':
+    main()
+
