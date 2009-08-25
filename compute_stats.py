@@ -1,12 +1,18 @@
 #!/usr/bin/python
 
-import pprint
-import sys
+import collections
 import csv
 import math
+import pprint
 import random
 import os
-import collections
+import simplejson as json
+import shutil
+import sys
+
+BASE_SKILL = 1500
+MOVEMENT_CONST = 15
+
 
 HOMEWORLDS = ["Alpha Centauri", "Epsilon Eridani", "Old Earth",
               "Ancient Race", "Damaged Alien Factory",
@@ -25,6 +31,8 @@ GOALS = [
     'All Colors',
     '3 Aliens',
     ]
+
+JS_INCLUDE = '<script type="text/javascript" src="genie_analysis.js"></script>'
 
 def Homeworld(player_info):
     # This misclassifes initial doomed world settles that are other homeworlds.
@@ -325,40 +333,47 @@ def NiceFormatWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
 def FilterOutNonGoals(games):
     return [g for g in games if 'goals' in g]
 
-def ComputeWinningStatsByHomeworldGoal(games):
-    games = FilterOutNonGoals(games)
-    print 'total games with goals analyzed', len(games)
-    def HomeworldGoalYielder(player_result, game):
-        for goal in game['goals']:
-            yield Homeworld(player_result), goal
-    bucketted_by_homeworld_goal = ComputeWinningStatsByBucket(
-        games, HomeworldGoalYielder)
-    keyed_by_homeworld_goal = {}
-    for (homeworld, goal), win_rate, exp_wins in bucketted_by_homeworld_goal:
-        keyed_by_homeworld_goal[(homeworld, goal)] = win_rate
+class HomeworldGoalAnalysis:
+    def __init__(self, games):
+        games = FilterOutNonGoals(games)
+        def HomeworldGoalYielder(player_result, game):
+            for goal in game['goals']:
+                yield Homeworld(player_result), goal
+        self.bucketted_by_homeworld_goal = ComputeWinningStatsByBucket(
+            games, HomeworldGoalYielder)
+        self.keyed_by_homeworld_goal = {}
+        for (homeworld, goal), win_rate, exp_wins in (
+            self.bucketted_by_homeworld_goal):
+            self.keyed_by_homeworld_goal[(homeworld, goal)] = win_rate
         
-    HOMEWORLD_SPACE = 25
-    PER_NUM_SPACE = 8
-    print ''.ljust(HOMEWORLD_SPACE + PER_NUM_SPACE),
-    for goal in GOALS[::2]:
-        print goal.ljust(PER_NUM_SPACE * 2 + 1),
-    print
+        self.bucketted_by_homeworld = ComputeWinningStatsByHomeworld(games)
 
-    print ''.ljust(HOMEWORLD_SPACE + PER_NUM_SPACE * 2),
-    for goal in GOALS[1::2]:
-        print goal.ljust(PER_NUM_SPACE * 2 + 1),
-    print
-    
-    bucketted_by_homeworld = ComputeWinningStatsByHomeworld(games)
-    for homeworld, win_rate, exp_wins in bucketted_by_homeworld:
-        print homeworld.ljust(HOMEWORLD_SPACE), ('%.3f' % win_rate).ljust(PER_NUM_SPACE),
-        
+    def RenderStatsAsHtml(self):
+        html = '<table border=1><tr><td>Homeworld</td><td>'
+        html += 'Baseline Winning Rate</td>'
         for goal in GOALS:
-            diff_as_str = '%.3f' % (
-                (keyed_by_homeworld_goal[(homeworld, goal)] - win_rate))
-            print diff_as_str.ljust(PER_NUM_SPACE),
-        print
-        
+            html += '<td>%s</td>' % goal
+        html += '</tr>\n'
+
+        for homeworld, win_rate, exp_wins in self.bucketted_by_homeworld:
+            html += '<tr><td>%s</td><td>%.3f</td>' % (homeworld, win_rate)
+            for goal in GOALS:
+                diff = (
+                    self.keyed_by_homeworld_goal[(homeworld, goal)] - win_rate)
+                html += '<td>%.3f</td>' % diff
+            html += '</tr>\n'
+        return html
+
+    def RenderToJson(self):
+        ret = []
+        for homeworld, win_rate, exp_wins in self.bucketted_by_homeworld:
+            ret.append({'homeworld': homeworld, 'win_rate': win_rate,
+                        'adjusted_rate': []})
+            for goal in GOALS:
+                ret[-1]['adjusted_rate'].append(
+                    self.keyed_by_homeworld_goal[(homeworld, goal)])
+        return json.dumps(ret)
+                        
 
 def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings):
     untied_games = FilterOutTies(games)
@@ -440,7 +455,9 @@ class OverviewStats:
     def RenderAsHTMLTable(self):
         header_fmt = '<table border=1><tr><td>%s</td><td>Num Games' + (
             '</td><td>Percentage</td></tr>')
-        html = '<a name="overview">Last seen game %d<br>' % self.max_game_no
+        html = '<a name="overview">'
+        html += 'Total games %d<br>\n' % self.games_played
+        html += 'Last seen game %d<br>\n' % self.max_game_no
         html += header_fmt % 'Player Size'
         for size in self.player_size:
             html += '<tr><td>%s</td><td>%d</td><td>%d%%</td></tr>' % (
@@ -459,22 +476,41 @@ def PlayerFile(player_name):
 def PlayerLink(player_name):
     return '<a href="' + PlayerFile(player_name) + '">' + player_name + '</a>'
 
-def RenderTopPage(games, skill_ratings):
+def RenderTopPage(games, skill_ratings, 
+                  with_goals_ratings, without_goals_ratings):
     overview = OverviewStats(games)
     top_out = open('output/index.html', 'w')
     
-    top_out.write('<html><head><title>Genie Overview Stats</title><head>\n')
+    top_out.write('<html><head><title>Genie Overview Stats</title>' + 
+                  JS_INCLUDE + '<head>\n')
     top_out.write('<body>' + overview.RenderAsHTMLTable())
 
-    top_out.write('<table border=1>')
+    homeworld_goal_analysis = HomeworldGoalAnalysis(games)
+    top_out.write(homeworld_goal_analysis.RenderStatsAsHtml());
+    top_out.write('<canvas id="homeworld_goal_canvas" width=500>Sorry ' +
+                  'canvas not supported by your browser, install recent '
+                  'version of Firefox or Opera or Safari</canvas>')
+                  
+    top_out.write('<script type="text/javascript">\n' +
+                  'var homeworld_goal_data = ' + 
+                  homeworld_goal_analysis.RenderToJson() + ';\n' +
+                  'RenderHomeworldGoalData("homeworld_goal_canvas", '
+                  'homeworld_goal_data);\n' + 
+                  '</script>');
 
+    top_out.write('<table border=1>')
     player_by_skill = skill_ratings.PlayersSortedBySkill()
     top_out.write('Total players %d\n' % len(player_by_skill))
-    top_out.write('<tr><td>Rank</td><td>Player Name</td><td>Rating</td></tr>\n')
+    top_out.write('<tr><td>Rank</td><td>Player Name</td><td>Rating</td>' +
+                  '<td>With Goals</td><td>Without Goals</td></tr>\n')
     for ind, (player_name, skill_info) in enumerate(player_by_skill):
-        top_out.write('<tr><td>%d</td><td>%s</td><td>%.0f</td></tr>\n' %
-                      (ind + 1, PlayerLink(player_name), skill_info.rating))
-    top_out.write('</table')
+        top_out.write('<tr><td>%d</td><td>%s</td><td>%.0f</td>'
+                      '<td>%.0f</td><td>%0.f</td></tr>\n' %
+                      (ind + 1, PlayerLink(player_name), skill_info.rating,
+                       with_goals_ratings.GetSkillInfo(player_name).rating,
+                       without_goals_ratings.GetSkillInfo(player_name).rating,
+                       ))
+    top_out.write('</table>')
 
     top_out.write('</body></html>')
 
@@ -516,16 +552,46 @@ def RenderPlayerPage(player, player_games, skill_ratings):
     WritePlayerFloatPairsAsTableRows(player_out, linked_out)
     player_out.write('</table>')
 
-
-
     player_out.write('</html>')
 
+def CopySupportFilesToOutput(debugging_on):
+    if os.access('output/genie_analysis.js', os.O_RDONLY):
+        os.remove('output/genie_analysis.js')
+    if not debugging_on:
+        shutil.copy('genie_analysis.js', 'output')
+    else:
+        os.system('ln -s ./../genie_analysis.js output/genie_analysis.js')
+
+    if not os.access('output/flot', os.O_RDONLY):
+        shutil.copytree('flot', 'output/flot')
+    if not os.access('output/images', os.O_RDONLY):
+        shutil.copytree('images', 'output/images')
+
 def main():
-    games = eval(open('condensed_games.json').read())
-    #games = eval(open('terse_games.json').read())
-    #open('terse_games.json', 'w').write(str(random.sample(games, 100)))
-        
-    skill_ratings = SkillRatings(games, EloProbability, 1500, 15)
+    debugging_on = False
+    if len(sys.argv) > 1:
+        debugging_on = True
+
+    if debugging_on:
+        games = eval(open('terse_games.json').read())
+    else:
+        games = eval(open('condensed_games.json').read())
+        open('terse_games.json', 'w').write(str(random.sample(games, 1000)))
+    
+    skill_ratings = SkillRatings(games, EloProbability, BASE_SKILL, 
+                                 MOVEMENT_CONST)
+    with_goals_games, without_goals_games = [], []
+    for game in games:
+        if 'goals' in game and game['goals']:
+            with_goals_games.append(game)
+        else:
+            without_goals_games.append(game)
+
+    with_goals_ratings = SkillRatings(with_goals_games, EloProbability, 
+                                      BASE_SKILL, MOVEMENT_CONST)
+    without_goals_ratings = SkillRatings(without_goals_games, 
+                                         EloProbability, BASE_SKILL, 
+                                         MOVEMENT_CONST)
     # #     print skill_ratings.GetSkillInfo( 'rrenaud' ).rating
     #NiceFormatWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings)
 
@@ -533,10 +599,12 @@ def main():
     #     pprint.pprint(player_card_info.PlayerVsBaseCardInfo('Danny'))
     if not os.access('output', os.O_RDONLY):
         os.mkdir('output')
-    RenderTopPage(games, skill_ratings)
+    RenderTopPage(games, skill_ratings, with_goals_ratings, 
+                  without_goals_ratings)
 
     for player, player_games in PlayerToGameList(games).iteritems():
         RenderPlayerPage(player, player_games, skill_ratings)
+    CopySupportFilesToOutput(debugging_on)
 
 if __name__ == '__main__':
     main()
