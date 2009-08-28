@@ -217,7 +217,8 @@ class SkillRatings:
                 self.ratings[player_name].exp_wins += 1.0 / (
                     len(game['player_list']))
 
-                homeworld = Homeworld(GetPlayerResultForName(game, win_name))
+                homeworld = Homeworld(GetPlayerResultForName(game,
+                                                             player_name))
 
 		self.rating_by_homeworld_flow[player_name][homeworld] += (
                     delta[player_name])
