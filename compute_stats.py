@@ -487,10 +487,12 @@ def RenderTopPage(games, skill_ratings,
 
     homeworld_goal_analysis = HomeworldGoalAnalysis(games)
     top_out.write(homeworld_goal_analysis.RenderStatsAsHtml());
-    top_out.write('<canvas id="homeworld_goal_canvas" width=500>Sorry ' +
-                  'canvas not supported by your browser, install recent '
-                  'version of Firefox or Opera or Safari</canvas>')
-                  
+    top_out.write('<h2>Goal Influence</h2>' + 
+                  '<h3>Goal Influence Graph</h3>' +
+                  '<span id="homeworld_goal_canvas_desc"></span>' +
+                  '<canvas id="homeworld_goal_canvas" height=500 width=800>'
+                  'Sorry canvas not supported by your browser.'
+                  'install recent version of Firefox or Opera or Safari</canvas>')
     top_out.write('<script type="text/javascript">\n' +
                   'var homeworld_goal_data = ' + 
                   homeworld_goal_analysis.RenderToJson() + ';\n' +
@@ -498,7 +500,7 @@ def RenderTopPage(games, skill_ratings,
                   'homeworld_goal_data);\n' + 
                   '</script>');
 
-    top_out.write('<table border=1>')
+    top_out.write('<h3>Goal Influence Table</h3><table border=1>')
     player_by_skill = skill_ratings.PlayersSortedBySkill()
     top_out.write('Total players %d\n' % len(player_by_skill))
     top_out.write('<tr><td>Rank</td><td>Player Name</td><td>Rating</td>' +
