@@ -489,10 +489,10 @@ def RenderTopPage(games, skill_ratings,
     top_out.write(homeworld_goal_analysis.RenderStatsAsHtml());
     top_out.write('<h2>Goal Influence</h2>' + 
                   '<h3>Goal Influence Graph</h3>' +
-                  '<span id="homeworld_goal_canvas_desc"></span>' +
-                  '<canvas id="homeworld_goal_canvas" height=500 width=800>'
-                  'Sorry canvas not supported by your browser.'
-                  'install recent version of Firefox or Opera or Safari</canvas>')
+                  '<span id="homeworld_goal_canvas_desc"></span><br>' +
+                  '<canvas id="homeworld_goal_canvas" height=500 width=800>' +
+                  '</canvas>'
+                  )
     top_out.write('<script type="text/javascript">\n' +
                   'var homeworld_goal_data = ' + 
                   homeworld_goal_analysis.RenderToJson() + ';\n' +
@@ -531,7 +531,7 @@ def RenderPlayerPage(player, player_games, skill_ratings):
     overview = OverviewStats(player_games)
     player_out = open('output/' + PlayerFile(player), 'w')
     player_out.write('<html><head><title>Genie Statistics for player %s'
-                     '<title></head><body>\n' % player)
+                     '</title></head><body>\n' % player)
 
     player_out.write('<a href="#overview">Overview</a>\n' 
                      '<a href="#homeworld_flow">Homeworld Rating Flow</a>'
