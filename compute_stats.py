@@ -32,6 +32,7 @@ GOALS = [
     '3 Aliens',
     ]
 
+TITLE = 'Masters of Space: Race for the Galaxy Statistics'
 JS_INCLUDE = '<script type="text/javascript" src="genie_analysis.js"></script>'
 
 def Homeworld(player_info):
@@ -172,19 +173,11 @@ class PlayerSkillInfo:
         self.rating = rating
         self.wins = wins
         self.exp_wins = exp_wins
+        self.percentile = None
 
     def __repr__(self):
         return str(self.rating)
 
-class PlayerInfo:
-    def __init__(self):
-	pass
-
-    def SetRatingFlowByOpponent(rating_flow):
-	self.rating_flow_by_opponent = rating_flow
-
-    def SetRatingFlowByHomeworld(rating_flow):
-	self._rating_flow_by_homeworld = rating_flow
 
 def SortDictByKeys(d):
     return sorted(d.items(), key = lambda x: -x[1])
@@ -228,22 +221,38 @@ class SkillRatings:
                 self.rating_flow[win_name][player_name] -= delta[player_name]
                 self.rating_flow[player_name][win_name] += delta[player_name]
 
-
             self.ratings[win_name].wins += 1.0
+
+        self.sorted_by_skill = sorted(self.ratings.items(),
+                                      key = lambda x: -x[1].rating)
+        self.ranking_percentile = {}
+        for idx, (name, skill_info) in enumerate(self.sorted_by_skill):
+            self.ranking_percentile[name] = 100.0 * (1.0 - (
+                float(idx) / len(self.sorted_by_skill)))
+        
 
     def GetHomeworldSkillFlow(self, name):
 	return SortDictByKeys(self.rating_by_homeworld_flow[name])
+
+    def HasPlayer(self, name):
+        return name in self.ratings
+
+    def NumPlayers(self):
+        return len(self.ratings)
 
     def GetSkillInfo(self, name):
         if name not in self.ratings:
             self.ratings[name] = PlayerSkillInfo(self.base_rating, 0, 0)
         return self.ratings[name]
 
+    def GetPercentile(self, name):
+        return self.ranking_percentile[name]
+
     def GetRatingFlow(self, name):
         return SortDictByKeys(self.rating_flow[name])
 
     def PlayersSortedBySkill(self):
-        return sorted(self.ratings.items(), key = lambda x: -x[1].rating) 
+        return self.sorted_by_skill
 
     def ComputeRatingBuckets(self, games, num_buckets):
         skills_weighted_by_games = []
@@ -477,13 +486,12 @@ def PlayerFile(player_name):
 def PlayerLink(player_name):
     return '<a href="' + PlayerFile(player_name) + '">' + player_name + '</a>'
 
-def RenderTopPage(games, skill_ratings, 
-                  with_goals_ratings, without_goals_ratings):
+def RenderTopPage(games, rankings_by_game_type):
     overview = OverviewStats(games)
     top_out = open('output/index.html', 'w')
     
-    top_out.write('<html><head><title>Genie Overview Stats</title>' + 
-                  JS_INCLUDE + '<head>\n')
+    top_out.write('<html><head><title>' + TITLE + '</title>' + JS_INCLUDE + '<head>\n')
+                  
     top_out.write('<body>' + overview.RenderAsHTMLTable())
 
     homeworld_goal_analysis = HomeworldGoalAnalysis(games)
@@ -502,19 +510,7 @@ def RenderTopPage(games, skill_ratings,
                   '</script>');
 
     top_out.write('<h3>Goal Influence Table</h3><table border=1>')
-    player_by_skill = skill_ratings.PlayersSortedBySkill()
-    top_out.write('Total players %d\n' % len(player_by_skill))
-    top_out.write('<tr><td>Rank</td><td>Player Name</td><td>Rating</td>' +
-                  '<td>With Goals</td><td>Without Goals</td></tr>\n')
-    for ind, (player_name, skill_info) in enumerate(player_by_skill):
-        top_out.write('<tr><td>%d</td><td>%s</td><td>%.0f</td>'
-                      '<td>%.0f</td><td>%0.f</td></tr>\n' %
-                      (ind + 1, PlayerLink(player_name), skill_info.rating,
-                       with_goals_ratings.GetSkillInfo(player_name).rating,
-                       without_goals_ratings.GetSkillInfo(player_name).rating,
-                       ))
-    top_out.write('</table>')
-
+    rankings_by_game_type.RenderAllRankingsAsHTML(top_out)
     top_out.write('</body></html>')
 
 def PlayerToGameList(games):
@@ -528,11 +524,66 @@ def WritePlayerFloatPairsAsTableRows(output_file, pairs):
     for s, f in pairs:
         output_file.write('<tr><td>%s</td><td>%.1f</td></tr>\n' % (s, f))
 
-def RenderPlayerPage(player, player_games, skill_ratings):
+def GoalGame(game):
+    return 'goals' in game and game['goals']
+
+class RankingByGameTypeAnalysis:
+    def __init__(self, games):
+        self.filters = [
+            ('all games', lambda game: True),
+            ('goal games', lambda game: GoalGame(game)),
+            ('non goal games', lambda game: not GoalGame(game)),
+            ('2 player adv',
+             lambda game: len(game['player_list']) == 2 and game['advanced']),
+            ('2 player not adv', 
+             lambda game: len(game['player_list']) == 2 and
+             not game['advanced']),
+            ('3 player', lambda game: len(game['player_list']) == 3),
+            ('4 player', lambda game: len(game['player_list']) == 4)
+            ]
+        self.filt_game_lists = [[] for filt in self.filters]
+        for game in games:
+            for (_, filter_func), filt_list in zip(self.filters, self.filt_game_lists):
+                if filter_func(game):
+                    filt_list.append(game)
+        self.rating_systems = [SkillRatings(games, EloProbability, BASE_SKILL, 
+                                            MOVEMENT_CONST) for games in
+                               self.filt_game_lists]
+
+    def AllGamesRatings(self):
+        return self.rating_systems[0]
+
+    def RenderAllRankingsAsHTML(self, top_out):
+        top_out.write('<h2>Player rankings by game type</h2>')
+        top_out.write('Total players %d<br>\n' % self.rating_systems[0].NumPlayers())
+        top_out.write('<table border=1>')
+        
+        top_out.write('<tr><td>Player Name</td>')
+        for filt_name, filt_func in self.filters:
+            top_out.write('<td>' + filt_name + '</td>')
+        top_out.write('<tr>\n')
+            
+        for player_name, skill in self.rating_systems[0].PlayersSortedBySkill():
+            top_out.write('<tr><td>' + PlayerLink(player_name) + '</td>')
+            for rating_system in self.rating_systems:
+                if (rating_system.HasPlayer(player_name) and
+                    rating_system.GetSkillInfo(player_name).exp_wins >= 3):
+                    contents = '%d (%.1f%%)' % (
+                        rating_system.GetSkillInfo(player_name).rating,
+                        rating_system.GetPercentile(player_name))
+                else:
+                    contents = ''
+                top_out.write('<td>' + contents + '</td>')
+            top_out.write('</tr>')
+        top_out.write('</table>')
+
+
+
+def RenderPlayerPage(player, player_games, by_game_type_analysis):
     overview = OverviewStats(player_games)
     player_out = open('output/' + PlayerFile(player), 'w')
-    player_out.write('<html><head><title>Genie Statistics for player %s'
-                     '</title></head><body>\n' % player)
+    player_out.write('<html><head><title> %s %s'
+                     '</title></head><body>\n' % (TITLE, player))
 
     player_out.write('<a href="#overview">Overview</a>\n' 
                      '<a href="#homeworld_flow">Homeworld Rating Flow</a>'
@@ -543,18 +594,20 @@ def RenderPlayerPage(player, player_games, skill_ratings):
     player_out.write('<a name="homeworld_flow"> '
                      '<table border=1><tr><td>Homeworld</td>'
                      '<td>Net rating change when playing<td></tr>')
+    all_games_ratings = by_game_type_analysis.AllGamesRatings()
     WritePlayerFloatPairsAsTableRows(
-        player_out, skill_ratings.GetHomeworldSkillFlow(player))
+        player_out, all_games_ratings.GetHomeworldSkillFlow(player))
+        
     player_out.write('</table>')
 
     player_out.write('<a name="player_flow"> '
                      '<table border=1><tr><td>Opponent</td>'
                      '<td>Net rating flow</td></tr>\n')
     linked_out = [(PlayerLink(o), s) for o, s in
-                  skill_ratings.GetRatingFlow(player)]
+                  all_games_ratings.GetRatingFlow(player)]
     WritePlayerFloatPairsAsTableRows(player_out, linked_out)
     player_out.write('</table>')
-
+    
     player_out.write('</html>')
 
 def CopySupportFilesToOutput(debugging_on):
@@ -580,33 +633,14 @@ def main():
     else:
         games = eval(open('condensed_games.json').read())
         open('terse_games.json', 'w').write(str(random.sample(games, 1000)))
-    
-    skill_ratings = SkillRatings(games, EloProbability, BASE_SKILL, 
-                                 MOVEMENT_CONST)
-    with_goals_games, without_goals_games = [], []
-    for game in games:
-        if 'goals' in game and game['goals']:
-            with_goals_games.append(game)
-        else:
-            without_goals_games.append(game)
 
-    with_goals_ratings = SkillRatings(with_goals_games, EloProbability, 
-                                      BASE_SKILL, MOVEMENT_CONST)
-    without_goals_ratings = SkillRatings(without_goals_games, 
-                                         EloProbability, BASE_SKILL, 
-                                         MOVEMENT_CONST)
-    # #     print skill_ratings.GetSkillInfo( 'rrenaud' ).rating
-    #NiceFormatWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings)
-
-    #     player_card_info = PlayerCardAffinity(games)
-    #     pprint.pprint(player_card_info.PlayerVsBaseCardInfo('Danny'))
+    by_game_type_analysis = RankingByGameTypeAnalysis(games)
     if not os.access('output', os.O_RDONLY):
         os.mkdir('output')
-    RenderTopPage(games, skill_ratings, with_goals_ratings, 
-                  without_goals_ratings)
+    RenderTopPage(games, by_game_type_analysis)
 
     for player, player_games in PlayerToGameList(games).iteritems():
-        RenderPlayerPage(player, player_games, skill_ratings)
+        RenderPlayerPage(player, player_games, by_game_type_analysis)
     CopySupportFilesToOutput(debugging_on)
 
 if __name__ == '__main__':
