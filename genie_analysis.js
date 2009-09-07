@@ -33,15 +33,7 @@ function LoadImages() {
 
 function RenderHomeworldGoalData(canvas_id, data) {
     LoadImages();
-    var desc = "Influence of goal on winning rate of homeworld.<br>" +
-	"The baseline winning rate of each homeworld is the fat dot. " +
-	"The winning rate with the goal is the end of the segment without" +
-	"the dot.  Hence, you can tell the absolute rate of winning by the " +
-	"end of the line, and the relative change by the magnitude of the line.";
-
     window.onload = function() {
-	document.getElementById('homeworld_goal_canvas_desc').innerHTML = desc;
-									 
 	var canvas = document.getElementById(canvas_id);
 	var context = canvas.getContext('2d');
 	var fillText = function(a, b, c) { };

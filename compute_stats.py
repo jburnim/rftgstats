@@ -35,6 +35,58 @@ GOALS = [
 TITLE = 'Masters of Space: Race for the Galaxy Statistics'
 JS_INCLUDE = '<script type="text/javascript" src="genie_analysis.js"></script>'
 
+INTRO_BLURB = """<h2>Introduction</h2><p>Hi, welcome to rrenaud's Race 
+for the Galaxy statistics page.
+All of the data here is collected from the wonderful 
+<a href="http://genie.game-host.org">Genie online Race for the Galaxy server
+</a>.  The code that computes this information is open source and available
+at <a href="http://code.google.com/p/rftgstats">the rftgstats google code 
+project</a>.  Contributions welcome!</p>"""
+
+RATING_BLURB = """<h3>Rating Methodology</h3>
+Each column comes from running an Elo rating algorithm on the appriopriately
+filtered set of games.  The first number is the rating and the second number is
+the percentile for that rating.  To display a rating, 10 2-player games, 
+7 3-player, or 5 4-player games are required. 
+These differ from the Genie rating in at
+least the following ways.
+<ul>
+<li>The ratings are computed with an Elo system with K value 15.  I am
+unsure about what the Genie server uses.
+<font size=-1>Eventually, I'll play around with fitting some more sophisticated
+models to the data.</font></li>
+<li>Ties do not count.</li>
+<li>In multiplayer games, a second place is scored the same as a last place
+finish.  Win or bust!</li>
+<li>The ratings are computed in game number order (which is ordered by game 
+start time),
+rather than game end time, as Genie does.  Since there are some players who game
+the Genie system, I suspect this method may be slightly more accurate simply 
+because players do not have much of an incentive to game it.</li>
+<li>The ratings lag genie by some amount, often by days or so.  
+<font size=-1>Eventually, I'll also fix this, making it lag only a few minutes.
+</font>
+</li>
+</ul>
+"""
+
+HOMEWORLD_WINNING_RATE_DESCRIPTION = """<p>Influence of goal on winning rate 
+of homeworld.
+<p>The winning rate is a generalization of winning probability that scales
+fairly to multiplayer games with different distribubtions of number of 
+players.  An <i>n</i> player game is
+worth <i>n</i> points.  The wining rate is the
+number of points accumulated divided by the number of games played.  
+Thus, if you win a 4 player game, lose a 3 player game, and lose a 2
+player game, your winning rate would (4 + 0 + 0) / 3 = 1.33.
+Thus, a totally average and optimally balanced homeworld will have a 
+winning rate of near 1 after many games.
+<p>The baseline winning rate of each homeworld is the fat dot. 
+The winning rate with the goal is the end of the segment without 
+the dot.  Hence, you can tell the absolute rate of winning by the 
+end of the line, and the relative change by the magnitude of the line.</p>
+"""
+
 def Homeworld(player_info):
     # This misclassifes initial doomed world settles that are other homeworlds.
     # I doubt that happens all that often though.
@@ -169,10 +221,11 @@ def GetPlayerResultForName(game, player_name):
 	    return player
 
 class PlayerSkillInfo:
-    def __init__(self, rating, wins, exp_wins):
+    def __init__(self, rating, wins, exp_wins, games_played):
         self.rating = rating
         self.wins = wins
         self.exp_wins = exp_wins
+        self.games_played = games_played
         self.percentile = None
 
     def __repr__(self):
@@ -182,33 +235,68 @@ class PlayerSkillInfo:
 def SortDictByKeys(d):
     return sorted(d.items(), key = lambda x: -x[1])
 
-class SkillRatings:
-    def __init__(self, games, prob_func, base_rating, move_const):
+class EloSkillModel:
+    def __init__(self, base_rating, move_const):
         self.ratings = {}
         self.base_rating = base_rating
+        self.move_const = move_const
+
+    def Predict(self, winner_name, loser_name):
+        winner_rating = self.GetSkillInfo(winner_name).rating
+        loser_rating = self.GetSkillInfo(loser_name).rating
+        return EloProbability(winner_rating, loser_rating)
+
+    def AdjustRatings(self, winner, losers):
+        """Adjust the winner and losers ratings; return the rating changes."""
+        delta = {winner: 0.0}
+        for loser in losers:
+            winner_wins_prob = self.Predict(winner, loser)
+            loser_wins_prob = 1.0 - winner_wins_prob
+            # higher loser_wins_prob means a weaker opponent, which should
+            # be penalized more.
+            loser_rating_move = -loser_wins_prob * self.move_const
+            delta[loser] = loser_rating_move
+            self.ratings[loser].rating += loser_rating_move
+            delta[winner] += -loser_rating_move
+            self.ratings[winner].rating += -loser_rating_move
+        return delta
+
+    def GetSkillInfo(self, name):
+        if name not in self.ratings:
+            self.ratings[name] = PlayerSkillInfo(self.base_rating, 0, 0, 0)
+        return self.ratings[name]
+
+    def PlayersSortedBySkill(self):
+        return sorted(self.ratings.items(),
+                      key = lambda x: -x[1].rating)
+
+
+class SkillRatings:
+    def __init__(self, games, skill_model):
+        self.skill_model = skill_model
 	self.rating_flow = collections.defaultdict(
             lambda: collections.defaultdict(int))
 	self.rating_by_homeworld_flow = collections.defaultdict(
             lambda: collections.defaultdict(int))
+        self.model_log_loss = 0.0
 
         for game in FilterOutTies(games):
             winner = GameWinners(game)[0]
             win_name = winner['name']
-            delta = {win_name: 0.0}
+            losers = []
             for player in game['player_list']:
                 if player['name'] == win_name:
                     continue
-                winner_rating = self.GetSkillInfo(win_name).rating
                 loser_name = player['name']
-                loser_rating = self.GetSkillInfo(loser_name).rating
-                win_prob = prob_func(winner_rating, loser_rating)
-                lose_prob = 1.0 - win_prob
-                delta[win_name] = delta[win_name] + win_prob * move_const
-                delta[loser_name] = -win_prob * move_const
+                win_prob = self.skill_model.Predict(win_name, loser_name)
+                self.model_log_loss += math.log(win_prob) / math.log(2)
+                losers.append(loser_name)
+
+            delta = self.skill_model.AdjustRatings(win_name, losers)
             for player_name in delta:
-                self.ratings[player_name].rating += delta[player_name]
-                self.ratings[player_name].exp_wins += 1.0 / (
-                    len(game['player_list']))
+                skill_info = self.GetSkillInfo(player_name)
+                skill_info.games_played += 1
+                skill_info.exp_wins += 1.0 / (len(game['player_list']))
 
                 homeworld = Homeworld(GetPlayerResultForName(game,
                                                              player_name))
@@ -221,29 +309,28 @@ class SkillRatings:
                 self.rating_flow[win_name][player_name] -= delta[player_name]
                 self.rating_flow[player_name][win_name] += delta[player_name]
 
-            self.ratings[win_name].wins += 1.0
+            self.GetSkillInfo(win_name).wins += 1.0
 
-        self.sorted_by_skill = sorted(self.ratings.items(),
-                                      key = lambda x: -x[1].rating)
+        self.sorted_by_skill = self.skill_model.PlayersSortedBySkill()
         self.ranking_percentile = {}
         for idx, (name, skill_info) in enumerate(self.sorted_by_skill):
             self.ranking_percentile[name] = 100.0 * (1.0 - (
                 float(idx) / len(self.sorted_by_skill)))
-        
 
+    def ModelPerformance(self):
+        return self.model_log_loss
+        
     def GetHomeworldSkillFlow(self, name):
 	return SortDictByKeys(self.rating_by_homeworld_flow[name])
 
     def HasPlayer(self, name):
-        return name in self.ratings
+        return name in self.ranking_percentile
 
     def NumPlayers(self):
-        return len(self.ratings)
+        return len(self.sorted_by_skill)
 
     def GetSkillInfo(self, name):
-        if name not in self.ratings:
-            self.ratings[name] = PlayerSkillInfo(self.base_rating, 0, 0)
-        return self.ratings[name]
+        return self.skill_model.GetSkillInfo(name)
 
     def GetPercentile(self, name):
         return self.ranking_percentile[name]
@@ -279,7 +366,8 @@ class SkillRatings:
 
 
 def EloProbability(r1, r2):
-    return 1 / (1 + 10 ** ((r1 - r2) / 400.0))
+    """Probability that r1 beats r2"""
+    return 1 / (1 + 10 ** ((r2 - r1) / 400.0))
 
 def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
     def CardSkillYielder(player_result, game):
@@ -463,11 +551,12 @@ class OverviewStats:
         self.race_type.sort()
 
     def RenderAsHTMLTable(self):
-        header_fmt = '<table border=1><tr><td>%s</td><td>Num Games' + (
-            '</td><td>Percentage</td></tr>')
+        header_fmt = ('<table border=1><tr><td>%s</td><td>Num Games' 
+                      '</td><td>Percentage</td></tr>' )
         html = '<a name="overview">'
-        html += 'Total games %d<br>\n' % self.games_played
-        html += 'Last seen game %d<br>\n' % self.max_game_no
+        html += '<h2>Overview</h2>'
+        html += 'Total games analyzed: %d<br>\n' % self.games_played
+        html += 'Last seen game number: %d<br>\n' % self.max_game_no
         html += header_fmt % 'Player Size'
         for size in self.player_size:
             html += '<tr><td>%s</td><td>%d</td><td>%d%%</td></tr>' % (
@@ -491,14 +580,16 @@ def RenderTopPage(games, rankings_by_game_type):
     top_out = open('output/index.html', 'w')
     
     top_out.write('<html><head><title>' + TITLE + '</title>' + JS_INCLUDE + '<head>\n')
-                  
-    top_out.write('<body>' + overview.RenderAsHTMLTable())
+
+    top_out.write('<body>')
+    top_out.write(INTRO_BLURB)
+    top_out.write(overview.RenderAsHTMLTable())
 
     homeworld_goal_analysis = HomeworldGoalAnalysis(games)
     top_out.write(homeworld_goal_analysis.RenderStatsAsHtml());
     top_out.write('<h2>Goal Influence</h2>' + 
                   '<h3>Goal Influence Graph</h3>' +
-                  '<span id="homeworld_goal_canvas_desc"></span><br>' +
+                  HOMEWORLD_WINNING_RATE_DESCRIPTION + 
                   '<canvas id="homeworld_goal_canvas" height=500 width=800>' +
                   '</canvas>'
                   )
@@ -527,47 +618,57 @@ def WritePlayerFloatPairsAsTableRows(output_file, pairs):
 def GoalGame(game):
     return 'goals' in game and game['goals']
 
+def TwoPlayerAdvanced(game):
+    return len(game['player_list']) == 2 and game['advanced']
+
+def TwoPlayerNotAdvanced(game):
+    return  len(game['player_list']) == 2 and not game['advanced']
+
 class RankingByGameTypeAnalysis:
     def __init__(self, games):
         self.filters = [
-            ('all games', lambda game: True),
-            ('goal games', lambda game: GoalGame(game)),
-            ('non goal games', lambda game: not GoalGame(game)),
-            ('2 player adv',
-             lambda game: len(game['player_list']) == 2 and game['advanced']),
-            ('2 player not adv', 
-             lambda game: len(game['player_list']) == 2 and
-             not game['advanced']),
-            ('3 player', lambda game: len(game['player_list']) == 3),
-            ('4 player', lambda game: len(game['player_list']) == 4)
+            ('all games', 10, lambda game: True),
+            ('goal games', 10, lambda game: GoalGame(game)),
+            ('non goal games', 10, lambda game: not GoalGame(game)),
+            ('2 player adv', 10, TwoPlayerAdvanced),
+            ('2 player not adv', 10, TwoPlayerNotAdvanced),
+            ('3 player', 7, lambda game: len(game['player_list']) == 3),
+            ('4 player', 5, lambda game: len(game['player_list']) == 4)
             ]
         self.filt_game_lists = [[] for filt in self.filters]
         for game in games:
-            for (_, filter_func), filt_list in zip(self.filters, self.filt_game_lists):
+            for (_, _, filter_func), filt_list in zip(
+                self.filters, self.filt_game_lists):
                 if filter_func(game):
                     filt_list.append(game)
-        self.rating_systems = [SkillRatings(games, EloProbability, BASE_SKILL, 
-                                            MOVEMENT_CONST) for games in
+        self.rating_systems = [SkillRatings(games, EloSkillModel(BASE_SKILL, 
+                                            MOVEMENT_CONST)) for games in
                                self.filt_game_lists]
+        #for i in [5, 7, 10, 15]:
+        #    print i, SkillRatings(games, EloSkillModel(BASE_SKILL, i)).ModelPerformance()
 
     def AllGamesRatings(self):
         return self.rating_systems[0]
 
     def RenderAllRankingsAsHTML(self, top_out):
         top_out.write('<h2>Player rankings by game type</h2>')
-        top_out.write('Total players %d<br>\n' % self.rating_systems[0].NumPlayers())
+        top_out.write(RATING_BLURB)
+        top_out.write('Total players %d<br>\n' % 
+                      self.rating_systems[0].NumPlayers())
         top_out.write('<table border=1>')
         
         top_out.write('<tr><td>Player Name</td>')
-        for filt_name, filt_func in self.filters:
+        for filt_name, _, filt_func in self.filters:
             top_out.write('<td>' + filt_name + '</td>')
         top_out.write('<tr>\n')
             
         for player_name, skill in self.rating_systems[0].PlayersSortedBySkill():
             top_out.write('<tr><td>' + PlayerLink(player_name) + '</td>')
-            for rating_system in self.rating_systems:
+            for rating_system, (_, games_req, _), in zip(self.rating_systems,
+                                                         self.filters):
                 if (rating_system.HasPlayer(player_name) and
-                    rating_system.GetSkillInfo(player_name).exp_wins >= 3):
+                    rating_system.GetSkillInfo(player_name).games_played 
+                    >= games_req):
                     contents = '%d (%.1f%%)' % (
                         rating_system.GetSkillInfo(player_name).rating,
                         rating_system.GetPercentile(player_name))
