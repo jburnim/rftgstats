@@ -158,8 +158,6 @@ function RenderCardWinInfo(data, canvas) {
       return;
     }
 
-    console.log(absX + "::" + absY + "  " + posX + "::" + posY + "  " + cards.join(", "));
-
     createPopup(posX + canvasPos[0] + 5, posY + canvasPos[1] + 5, cards.join(", "));
     return false;
   }
