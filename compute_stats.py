@@ -36,12 +36,15 @@ TITLE = 'Masters of Space: Race for the Galaxy Statistics'
 JS_INCLUDE = '<script type="text/javascript" src="genie_analysis.js"></script>'
 
 INTRO_BLURB = """<h2>Introduction</h2><p>Hi, welcome to Race for the Galaxy
-statistics page by rrenaud, Danny and Aragos.
+statistics page by rrenaud, Danny, and Aragos.
 All of the data here is collected from the wonderful
 <a href="http://genie.game-host.org">Genie online Race for the Galaxy server
 </a>.  The code that computes this information is open source and available
 at <a href="http://code.google.com/p/rftgstats">the rftgstats google code
-project</a>.  Contributions welcome!</p>
+project</a>.  These stats look best when viewed with a recent version of 
+<a href="http://mozilla.org">Firefox 3</a>.  In particular, some graphs may
+not show up or be missing text without a new version Firefox. 
+Contributions welcome!</p>
 
 <h3>A brief discussion about <i>Winning Rates</i></h3><p>
 An <i>n</i> player game is worth <i>n</i> points.  The wining rate is the
@@ -65,7 +68,7 @@ The y axis on this graph is the conditional winning rate of the card.
 The conditional winning rate of the card given that it was played.
 <p>
 Strong cards have high winning rates and tend to be played more often.  
-<p>You can click on an icon to card names.
+<p>You can click on a card's icon to see its name.
 Cards played as homeworlds are excluded from the data, so that they don't
 totally skew the play rate.  All the analyzed games are using the Gathering 
 Storm expansion so the play rate distribution is fair.
