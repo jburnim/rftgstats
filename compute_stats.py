@@ -41,7 +41,47 @@ All of the data here is collected from the wonderful
 <a href="http://genie.game-host.org">Genie online Race for the Galaxy server
 </a>.  The code that computes this information is open source and available
 at <a href="http://code.google.com/p/rftgstats">the rftgstats google code
-project</a>.  Contributions welcome!</p>"""
+project</a>.  Contributions welcome!</p>
+
+<h3>A brief discussion about <i>Winning Rates</i></h3><p>
+An <i>n</i> player game is worth <i>n</i> points.  The wining rate is the
+number of points accumulated divided by the number of games played.
+Thus, if you win a 4 player game, lose a 3 player game, and lose a 2
+player game, your winning rate would (4 + 0 + 0) / 3 = 1.33.
+Thus, a totally average and optimally balanced homeworld will have a
+winning rate of near 1 after many games.  Likewise, a player whose skill
+is totally representative of the distribution of the player population will
+have a winning rate of 1.
+"""
+
+WINNING_RATE_VS_PLAY_RATE_DESCRIPTION = """<p>
+<h2>Card winning rate vs play rate</h2>
+<p>
+This graph shows data by analyzing end game tableaus.  
+<p>
+The x axis is the play rate of the card. 
+<p>
+The y axis on this graph is the conditional winning rate of the card.
+The conditional winning rate of the card given that it was played.
+<p>
+Strong cards have high winning rates and tend to be played more often.  
+<p>You can click on an icon to card names.
+Cards played as homeworlds are excluded from the data, so that they don't
+totally skew the play rate.  All the analyzed games are using the Gathering 
+Storm expansion so the play rate distribution is fair.
+"""
+
+HOMEWORLD_WINNING_RATE_DESCRIPTION = """<p>Influence of goal on winning rate
+of homeworld.
+<p>The winning rate is a generalization of winning probability that scales
+fairly to multiplayer games with different distribubtions of number of
+players.  
+<p>The baseline winning rate of each homeworld is the fat dot.
+The winning rate with the goal is the end of the segment without
+the dot.  Hence, you can tell the absolute rate of winning by the
+end of the line, and the relative change by the magnitude of the line.</p>
+"""
+
 
 RATING_BLURB = """<h3>Rating Methodology</h3>
 Each column comes from running an Elo rating algorithm on the appriopriately
@@ -68,23 +108,6 @@ because players do not have much of an incentive to game it.</li>
 </font>
 </li>
 </ul>
-"""
-
-HOMEWORLD_WINNING_RATE_DESCRIPTION = """<p>Influence of goal on winning rate
-of homeworld.
-<p>The winning rate is a generalization of winning probability that scales
-fairly to multiplayer games with different distribubtions of number of
-players.  An <i>n</i> player game is
-worth <i>n</i> points.  The wining rate is the
-number of points accumulated divided by the number of games played.
-Thus, if you win a 4 player game, lose a 3 player game, and lose a 2
-player game, your winning rate would (4 + 0 + 0) / 3 = 1.33.
-Thus, a totally average and optimally balanced homeworld will have a
-winning rate of near 1 after many games.
-<p>The baseline winning rate of each homeworld is the fat dot.
-The winning rate with the goal is the end of the segment without
-the dot.  Hence, you can tell the absolute rate of winning by the
-end of the line, and the relative change by the magnitude of the line.</p>
 """
 
 def Homeworld(player_info):
@@ -372,8 +395,10 @@ def EloProbability(r1, r2):
 def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
     def CardSkillYielder(player_result, game):
         skill_info = skill_ratings.GetSkillInfo(player_result['name'])
-        for card in player_result['cards']:
-            yield card, skill_info.rating, skill_info.wins, skill_info.exp_wins
+        for idx, card in enumerate(player_result['cards']):
+            if not (idx == 0 and card in HOMEWORLDS):
+                yield (card, skill_info.rating, skill_info.wins, 
+                       skill_info.exp_wins)
     bucketted_stats = ComputeWinningStatsByBucket(games, CardSkillYielder)
 
     grouped_by_card = {}
@@ -585,8 +610,12 @@ def RenderTopPage(games, rankings_by_game_type):
     top_out.write(INTRO_BLURB)
     top_out.write(overview.RenderAsHTMLTable())
 
+    gathering_storm_games = [g for g in games if g['advanced']]
+    top_out.write(WINNING_RATE_VS_PLAY_RATE_DESCRIPTION)
+    top_out.write('From %d Gathering Storm games.<br>\n' %
+                  len(gathering_storm_games))
     card_win_info = ComputeWinningStatsByCardPlayedAndSkillLevel(
-            games, rankings_by_game_type.AllGamesRatings())
+        gathering_storm_games, rankings_by_game_type.AllGamesRatings())
 
     card_info = list(csv.DictReader(open('card_attributes.csv', 'r')))
     card_info = dict((x["Name"], x) for x in card_info)
