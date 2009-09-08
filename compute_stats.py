@@ -19,7 +19,7 @@ HOMEWORLDS = ["Alpha Centauri", "Epsilon Eridani", "Old Earth",
               "Earth's Lost Colony", "New Sparta",
               "Separatist Colony", "Doomed world"]
 
-GOALS = [ 
+GOALS = [
     '4+ Production',
     '4+ Devs',
     '6+ Military',
@@ -35,19 +35,19 @@ GOALS = [
 TITLE = 'Masters of Space: Race for the Galaxy Statistics'
 JS_INCLUDE = '<script type="text/javascript" src="genie_analysis.js"></script>'
 
-INTRO_BLURB = """<h2>Introduction</h2><p>Hi, welcome to rrenaud's Race 
-for the Galaxy statistics page.
-All of the data here is collected from the wonderful 
+INTRO_BLURB = """<h2>Introduction</h2><p>Hi, welcome to Race for the Galaxy
+statistics page by rrenaud, Danny and Aragos.
+All of the data here is collected from the wonderful
 <a href="http://genie.game-host.org">Genie online Race for the Galaxy server
 </a>.  The code that computes this information is open source and available
-at <a href="http://code.google.com/p/rftgstats">the rftgstats google code 
+at <a href="http://code.google.com/p/rftgstats">the rftgstats google code
 project</a>.  Contributions welcome!</p>"""
 
 RATING_BLURB = """<h3>Rating Methodology</h3>
 Each column comes from running an Elo rating algorithm on the appriopriately
 filtered set of games.  The first number is the rating and the second number is
-the percentile for that rating.  To display a rating, 10 2-player games, 
-7 3-player, or 5 4-player games are required. 
+the percentile for that rating.  To display a rating, 10 2-player games,
+7 3-player, or 5 4-player games are required.
 These differ from the Genie rating in at
 least the following ways.
 <ul>
@@ -58,32 +58,32 @@ models to the data.</font></li>
 <li>Ties do not count.</li>
 <li>In multiplayer games, a second place is scored the same as a last place
 finish.  Win or bust!</li>
-<li>The ratings are computed in game number order (which is ordered by game 
+<li>The ratings are computed in game number order (which is ordered by game
 start time),
 rather than game end time, as Genie does.  Since there are some players who game
-the Genie system, I suspect this method may be slightly more accurate simply 
+the Genie system, I suspect this method may be slightly more accurate simply
 because players do not have much of an incentive to game it.</li>
-<li>The ratings lag genie by some amount, often by days or so.  
+<li>The ratings lag genie by some amount, often by days or so.
 <font size=-1>Eventually, I'll also fix this, making it lag only a few minutes.
 </font>
 </li>
 </ul>
 """
 
-HOMEWORLD_WINNING_RATE_DESCRIPTION = """<p>Influence of goal on winning rate 
+HOMEWORLD_WINNING_RATE_DESCRIPTION = """<p>Influence of goal on winning rate
 of homeworld.
 <p>The winning rate is a generalization of winning probability that scales
-fairly to multiplayer games with different distribubtions of number of 
+fairly to multiplayer games with different distribubtions of number of
 players.  An <i>n</i> player game is
 worth <i>n</i> points.  The wining rate is the
-number of points accumulated divided by the number of games played.  
+number of points accumulated divided by the number of games played.
 Thus, if you win a 4 player game, lose a 3 player game, and lose a 2
 player game, your winning rate would (4 + 0 + 0) / 3 = 1.33.
-Thus, a totally average and optimally balanced homeworld will have a 
+Thus, a totally average and optimally balanced homeworld will have a
 winning rate of near 1 after many games.
-<p>The baseline winning rate of each homeworld is the fat dot. 
-The winning rate with the goal is the end of the segment without 
-the dot.  Hence, you can tell the absolute rate of winning by the 
+<p>The baseline winning rate of each homeworld is the fat dot.
+The winning rate with the goal is the end of the segment without
+the dot.  Hence, you can tell the absolute rate of winning by the
 end of the line, and the relative change by the magnitude of the line.</p>
 """
 
@@ -138,14 +138,14 @@ class PlayerCardAffinity:
             rekeyed_player_card_info[player_card] = (card_win_ratio,
                                                      card_exp_wins)
         self.player_card_info = rekeyed_player_card_info
-            
+
         self.num_games_by_player = collections.defaultdict(float)
         for game in games:
             for player_result in game['player_list']:
                 self.num_games_by_player[player_result['name']] += 1
 
         self.num_games = float(len(games))
-        
+
     def PlayerVsBaseCardInfo(self, player_name):
         card_diff_info = []
         for card_name, card_win_ratio, card_exp_wins in self.baseline_card_info:
@@ -161,7 +161,7 @@ class PlayerCardAffinity:
             card_diff_info.append((card_name, win_ratio_diff, play_ratio_diff))
         card_diff_info.sort(key = lambda x: x[1])
         return card_diff_info
-        
+
 
 def ComputeWinningStatsByPlayer(games):
     def PlayerYielder(player_result, game):
@@ -169,11 +169,11 @@ def ComputeWinningStatsByPlayer(games):
     return ComputeWinningStatsByBucket(games, PlayerYielder)
 
 def Score(result):
-    return result['points'] * 100 + result['goods'] + result['hand'] 
+    return result['points'] * 100 + result['goods'] + result['hand']
 
 def WinningScore(game):
     return max(Score(result) for result in game['player_list'])
-        
+
 
 def ComputeWinningStatsByBucket(games, bucketter):
     """ Returns a list of (bucket_key, win_ratio, exp_wins),
@@ -319,7 +319,7 @@ class SkillRatings:
 
     def ModelPerformance(self):
         return self.model_log_loss
-        
+
     def GetHomeworldSkillFlow(self, name):
 	return SortDictByKeys(self.rating_by_homeworld_flow[name])
 
@@ -375,7 +375,7 @@ def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
         for card in player_result['cards']:
             yield card, skill_info.rating, skill_info.wins, skill_info.exp_wins
     bucketted_stats = ComputeWinningStatsByBucket(games, CardSkillYielder)
-    
+
     grouped_by_card = {}
 
     for key, win_rate, exp_wins in bucketted_stats:
@@ -395,11 +395,11 @@ def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
 
     for card in grouped_by_card:
         card_stats = grouped_by_card[card]
-        card_stats['avg_rating'] = (card_stats['weighted_rating'] / 
+        card_stats['avg_rating'] = (card_stats['weighted_rating'] /
                                     card_stats['exp_wins'])
         del card_stats['weighted_rating']
 
-        card_stats['player_win_rate'] = (card_stats['player_wins'] / 
+        card_stats['player_win_rate'] = (card_stats['player_wins'] /
                                          card_stats['player_exp_wins'])
         del card_stats['player_wins']
         del card_stats['player_exp_wins']
@@ -422,10 +422,10 @@ def NiceFormatWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
                               'w_rate'.ljust(10))
         for card, info in win_stats_by_card_skill:
             print '%s%s%s%s%s' % (
-                card.ljust(30), 
-                ('%.0f' % info['avg_rating']).ljust(10), 
-                ('%.2f' % info['exp_wins']).ljust(10), 
-                ('%.2f' % info['player_win_rate']).ljust(10), 
+                card.ljust(30),
+                ('%.0f' % info['avg_rating']).ljust(10),
+                ('%.2f' % info['exp_wins']).ljust(10),
+                ('%.2f' % info['player_win_rate']).ljust(10),
                 ('%.2f' % info['win_rate']).ljust(10))
 
 def FilterOutNonGoals(games):
@@ -443,7 +443,7 @@ class HomeworldGoalAnalysis:
         for (homeworld, goal), win_rate, exp_wins in (
             self.bucketted_by_homeworld_goal):
             self.keyed_by_homeworld_goal[(homeworld, goal)] = win_rate
-        
+
         self.bucketted_by_homeworld = ComputeWinningStatsByHomeworld(games)
 
     def RenderStatsAsHtml(self):
@@ -471,12 +471,12 @@ class HomeworldGoalAnalysis:
                 ret[-1]['adjusted_rate'].append(
                     self.keyed_by_homeworld_goal[(homeworld, goal)])
         return json.dumps(ret)
-                        
+
 
 def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings):
     untied_games = FilterOutTies(games)
     NUM_SKILL_BUCKETS = 3
-    skill_buckets = skill_ratings.ComputeRatingBuckets(untied_games, 
+    skill_buckets = skill_ratings.ComputeRatingBuckets(untied_games,
                                                        NUM_SKILL_BUCKETS)
     print skill_buckets
 
@@ -485,7 +485,7 @@ def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings):
         skill_bucket = skill_ratings.PlayerSkillBucket(name, skill_buckets)
         yield (Homeworld(player_result), skill_bucket)
 
-    bucketted_stats = ComputeWinningStatsByBucket(untied_games, 
+    bucketted_stats = ComputeWinningStatsByBucket(untied_games,
                                                   HomeworldSkillYielder)
     keyed_by_bucket = {}
     for (homeworld, skill), win_rate, exp_wins in bucketted_stats:
@@ -513,7 +513,7 @@ def SixDevRankings(games):
 
     def Utility(card_stat):
         # Just some approximate way to measure how good a card performed.
-        # The first term is how much your winning rate increases from the 
+        # The first term is how much your winning rate increases from the
         # baseline, given that it was played.  It's given a bit more weight
         # than the second term, which is basically how often the card is played.
         return -(card_stat[1] - 1.0) * card_stat[2] ** .5
@@ -533,7 +533,7 @@ class OverviewStats:
             adv = ''
             if game['advanced'] == 1:
                 adv = ' adv'
-            
+
             players_size_str = '%dp%s' % ( len(game['player_list']), adv )
             player_size[players_size_str] += 1
 
@@ -551,7 +551,7 @@ class OverviewStats:
         self.race_type.sort()
 
     def RenderAsHTMLTable(self):
-        header_fmt = ('<table border=1><tr><td>%s</td><td>Num Games' 
+        header_fmt = ('<table border=1><tr><td>%s</td><td>Num Games'
                       '</td><td>Percentage</td></tr>' )
         html = '<a name="overview">'
         html += '<h2>Overview</h2>'
@@ -578,26 +578,43 @@ def PlayerLink(player_name):
 def RenderTopPage(games, rankings_by_game_type):
     overview = OverviewStats(games)
     top_out = open('output/index.html', 'w')
-    
+
     top_out.write('<html><head><title>' + TITLE + '</title>' + JS_INCLUDE + '<head>\n')
 
     top_out.write('<body>')
     top_out.write(INTRO_BLURB)
     top_out.write(overview.RenderAsHTMLTable())
 
+    card_win_info = ComputeWinningStatsByCardPlayedAndSkillLevel(
+            games, rankings_by_game_type.AllGamesRatings())
+
+    card_info = list(csv.DictReader(open('card_attributes.csv', 'r')))
+    card_info = dict((x["Name"], x) for x in card_info)
+
+    top_out.write('\n\n<script type="text/javascript">\n' +
+                  '  var cardInfo = ' + json.dumps(card_info, indent=2) + "\n" +
+                  '</script>\n')
+
+    top_out.write('\n<canvas id="cardWinInfoCanvas" height="500" width="800"></canvas>\n' +
+                  '<script type="text/javascript">\n' +
+                  '  var cardWinInfo = ' + json.dumps(card_win_info, indent=2) + ';\n' +
+                  '  RenderCardWinInfo(cardWinInfo, \n' +
+                  '      document.getElementById("cardWinInfoCanvas"));\n' +
+                  '</script>\n\n')
+
     homeworld_goal_analysis = HomeworldGoalAnalysis(games)
     top_out.write(homeworld_goal_analysis.RenderStatsAsHtml());
-    top_out.write('<h2>Goal Influence</h2>' + 
+    top_out.write('<h2>Goal Influence</h2>' +
                   '<h3>Goal Influence Graph</h3>' +
-                  HOMEWORLD_WINNING_RATE_DESCRIPTION + 
+                  HOMEWORLD_WINNING_RATE_DESCRIPTION +
                   '<canvas id="homeworld_goal_canvas" height=500 width=800>' +
                   '</canvas>'
                   )
     top_out.write('<script type="text/javascript">\n' +
-                  'var homeworld_goal_data = ' + 
+                  'var homeworld_goal_data = ' +
                   homeworld_goal_analysis.RenderToJson() + ';\n' +
                   'RenderHomeworldGoalData("homeworld_goal_canvas", '
-                  'homeworld_goal_data);\n' + 
+                  'homeworld_goal_data);\n' +
                   '</script>');
 
     top_out.write('<h3>Goal Influence Table</h3><table border=1>')
@@ -641,7 +658,7 @@ class RankingByGameTypeAnalysis:
                 self.filters, self.filt_game_lists):
                 if filter_func(game):
                     filt_list.append(game)
-        self.rating_systems = [SkillRatings(games, EloSkillModel(BASE_SKILL, 
+        self.rating_systems = [SkillRatings(games, EloSkillModel(BASE_SKILL,
                                             MOVEMENT_CONST)) for games in
                                self.filt_game_lists]
         #for i in [5, 7, 10, 15]:
@@ -653,21 +670,21 @@ class RankingByGameTypeAnalysis:
     def RenderAllRankingsAsHTML(self, top_out):
         top_out.write('<h2>Player rankings by game type</h2>')
         top_out.write(RATING_BLURB)
-        top_out.write('Total players %d<br>\n' % 
+        top_out.write('Total players %d<br>\n' %
                       self.rating_systems[0].NumPlayers())
         top_out.write('<table border=1>')
-        
+
         top_out.write('<tr><td>Player Name</td>')
         for filt_name, _, filt_func in self.filters:
             top_out.write('<td>' + filt_name + '</td>')
         top_out.write('<tr>\n')
-            
+
         for player_name, skill in self.rating_systems[0].PlayersSortedBySkill():
             top_out.write('<tr><td>' + PlayerLink(player_name) + '</td>')
             for rating_system, (_, games_req, _), in zip(self.rating_systems,
                                                          self.filters):
                 if (rating_system.HasPlayer(player_name) and
-                    rating_system.GetSkillInfo(player_name).games_played 
+                    rating_system.GetSkillInfo(player_name).games_played
                     >= games_req):
                     contents = '%d (%.1f%%)' % (
                         rating_system.GetSkillInfo(player_name).rating,
@@ -686,9 +703,9 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis):
     player_out.write('<html><head><title> %s %s'
                      '</title></head><body>\n' % (TITLE, player))
 
-    player_out.write('<a href="#overview">Overview</a>\n' 
+    player_out.write('<a href="#overview">Overview</a>\n'
                      '<a href="#homeworld_flow">Homeworld Rating Flow</a>'
-                     '<a href="#player_flow">Player Rating Flow</a>\n' 
+                     '<a href="#player_flow">Player Rating Flow</a>\n'
                      '<br>\n')
     player_out.write(overview.RenderAsHTMLTable())
 
@@ -698,7 +715,7 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis):
     all_games_ratings = by_game_type_analysis.AllGamesRatings()
     WritePlayerFloatPairsAsTableRows(
         player_out, all_games_ratings.GetHomeworldSkillFlow(player))
-        
+
     player_out.write('</table>')
 
     player_out.write('<a name="player_flow"> '
@@ -708,7 +725,7 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis):
                   all_games_ratings.GetRatingFlow(player)]
     WritePlayerFloatPairsAsTableRows(player_out, linked_out)
     player_out.write('</table>')
-    
+
     player_out.write('</html>')
 
 def CopySupportFilesToOutput(debugging_on):
