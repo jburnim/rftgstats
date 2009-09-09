@@ -62,7 +62,8 @@ WINNING_RATE_VS_PLAY_RATE_DESCRIPTION = """<p>
 <p>
 This graph shows data by analyzing end game tableaus.  
 <p>
-The x axis is the play rate of the card. 
+The x axis is the probability that the card will end up in the final tableau, 
+per instance of the card in the deck.
 <p>
 The y axis on this graph is the conditional winning rate of the card.
 The conditional winning rate is the winning rate of the card given that it 
@@ -419,7 +420,8 @@ def EloProbability(r1, r2):
 def TotalNumTableaus(games):
     return sum(len(g['player_list']) for g in games)
 
-def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
+def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings, 
+                                                 num_cards_by_name):
     def CardSkillYielder(player_result, game):
         skill_info = skill_ratings.GetSkillInfo(player_result['name'])
         for idx, card in enumerate(player_result['cards']):
@@ -464,29 +466,11 @@ def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
         card_stats['win_rate'] = card_stats['wins'] / card_stats['exp_wins']
         del card_stats['wins']
         
-        card_stats['probability'] = card_stats['frequency'] / total_tableaus
+        card_stats['prob_per_card'] = card_stats['frequency'] / (
+            total_tableaus * num_cards_by_name[card])
         del card_stats['frequency']
 
     return grouped_by_card
-
-def NiceFormatWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
-    win_stats_by_card_skill = ComputeWinningStatsByCardPlayedAndSkillLevel(
-        games, skill_ratings)
-    win_stats_by_card_skill = win_stats_by_card_skill.items()
-    keys = ['win_rate']
-    for key_name in keys:
-        win_stats_by_card_skill.sort(key = lambda x: -x[1][key_name])
-        print '\nsorted by', key_name
-        print '%s%s%s%s%s' % ('card_name'.ljust(30), 'avgrat'.ljust(10),
-                              'E[win]'.ljust(10), 'p_win_r'.ljust(10),
-                              'w_rate'.ljust(10))
-        for card, info in win_stats_by_card_skill:
-            print '%s%s%s%s%s' % (
-                card.ljust(30),
-                ('%.0f' % info['avg_rating']).ljust(10),
-                ('%.2f' % info['exp_wins']).ljust(10),
-                ('%.2f' % info['player_win_rate']).ljust(10),
-                ('%.2f' % info['win_rate']).ljust(10))
 
 def FilterOutNonGoals(games):
     return [g for g in games if 'goals' in g]
@@ -533,7 +517,7 @@ class HomeworldGoalAnalysis:
         return json.dumps(ret)
 
 
-def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings):
+def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings, card_info):
     untied_games = FilterOutTies(games)
     NUM_SKILL_BUCKETS = 3
     skill_buckets = skill_ratings.ComputeRatingBuckets(untied_games,
@@ -635,11 +619,23 @@ def PlayerFile(player_name):
 def PlayerLink(player_name):
     return '<a href="' + PlayerFile(player_name) + '">' + player_name + '</a>'
 
+def CardsPerName(card_info):
+    ret = {}
+    for card in card_info:
+        if card['Type'] == 'Development':
+            ret[card['Name']] = 2 - (card['Cost'] == '6')
+            if card['Name'] == 'Contact Specialist':
+                ret[card['Name']] = 3
+        else:
+            ret[card['Name']] = 1
+    return ret
+
 def RenderTopPage(games, rankings_by_game_type):
     overview = OverviewStats(games)
     top_out = open('output/index.html', 'w')
 
-    top_out.write('<html><head><title>' + TITLE + '</title>' + JS_INCLUDE + '<head>\n')
+    top_out.write('<html><head><title>' + TITLE + '</title>' + JS_INCLUDE + 
+                  '<head>\n')
 
     top_out.write('<body>')
     top_out.write(INTRO_BLURB)
@@ -649,15 +645,17 @@ def RenderTopPage(games, rankings_by_game_type):
     top_out.write(WINNING_RATE_VS_PLAY_RATE_DESCRIPTION)
     top_out.write('From %d Gathering Storm games.<br>\n' %
                   len(gathering_storm_games))
-    card_win_info = ComputeWinningStatsByCardPlayedAndSkillLevel(
-        gathering_storm_games, rankings_by_game_type.AllGamesRatings())
-
     card_info = list(csv.DictReader(open('card_attributes.csv', 'r')))
-    card_info = dict((x["Name"], x) for x in card_info)
+    num_cards_per_name = CardsPerName(card_info)
+    card_info_dict = dict((x["Name"], x) for x in card_info)
+    card_win_info = ComputeWinningStatsByCardPlayedAndSkillLevel(
+        gathering_storm_games, rankings_by_game_type.AllGamesRatings(),
+        num_cards_per_name)
+
 
     top_out.write('\n\n<script type="text/javascript">\n' +
-                  '  var cardInfo = ' + json.dumps(card_info, indent=2) + "\n" +
-                  '</script>\n')
+                  '  var cardInfo = ' + json.dumps(card_info_dict, indent=2) + 
+                  ';\n</script>\n')
 
     top_out.write('\n<canvas id="cardWinInfoCanvas" height="500" width="800"></canvas>\n' +
                   '<script type="text/javascript">\n' +

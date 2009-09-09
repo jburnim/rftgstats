@@ -114,9 +114,9 @@ function RenderCardWinInfo(data, canvas) {
       
 
   for (var name in data) {
-    card = data[name];
-    maxProbability = Math.max(maxProbability, card["probability"]);
-    minProbability = Math.min(minProbability, card["probability"]);
+    var card = data[name];
+    maxProbability = Math.max(maxProbability, card["prob_per_card"]);
+    minProbability = Math.min(minProbability, card["prob_per_card"]);
     maxWinRate = Math.max(maxWinRate, card["win_rate"]);
     minWinRate = Math.min(minWinRate, card["win_rate"]);
   }
@@ -132,10 +132,20 @@ function RenderCardWinInfo(data, canvas) {
 		 (maxWinRate - minWinRate) * 0.8 * height);
   }
 
-  // Draw dots.
+  var namesByCost = [];
   for (name in data) {
+      namesByCost.push(name);
+  }
+  namesByCost.sort(function(nameA, nameB) { 
+	  return parseInt(cardInfo[nameA]['Cost']) < 
+	      parseInt(cardInfo[nameB]['Cost']);
+      });
+
+  // Draw dots.
+  for (var i = 0; i < namesByCost.length; ++i) {
+    var name = namesByCost[i];
     card = data[name];
-    x = toCanvasX(card["probability"]);
+    x = toCanvasX(card["prob_per_card"]);
     y = toCanvasY(card["win_rate"]);
     if (!location[x]) {
       location[x] = []
@@ -148,6 +158,7 @@ function RenderCardWinInfo(data, canvas) {
     drawCard(context, x, y, cardInfo[name]);
   }
 
+  context.fillStyle = 'black';
   var fillText = GuardFillText(context);
   for (var i = 0; i <= 10; ++i) {
       var cur = i * (maxProbability - minProbability) / 10 + minProbability;
@@ -163,8 +174,10 @@ function RenderCardWinInfo(data, canvas) {
 
   canvas.onclick = function(event) {
     var canvasPos = findPos(canvas);
-    var absX = event.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
-    var absY = event.clientY + document.body.scrollTop + document.documentElement.scrollTop;
+    var absX = (event.clientX + document.body.scrollLeft + 
+		document.documentElement.scrollLeft);
+    var absY = (event.clientY + document.body.scrollTop + 
+		document.documentElement.scrollTop);
 
     var posX = absX - canvasPos[0];
     var posY = absY - canvasPos[1];
@@ -192,9 +205,9 @@ function RenderCardWinInfo(data, canvas) {
 function drawCard(context, x, y, card) {
   context.beginPath();
   context.fillStyle = 'rgba(220, 220, 70, .8)';
-  var cost = parseInt(card["Cost"]);
+  var renderSize = parseInt(card["Cost"]) + 1;
   if (card["Type"] == "World") {
-    context.arc(x, y, cost + 2, 0, Math.PI*2, true);
+    context.arc(x, y, renderSize + 2, 0, Math.PI*2, true);
     switch (card["Goods"]) {
       case "Novelty": context.fillStyle = 'rgba(0, 192, 255, .7)'; break;
       case "Rare": context.fillStyle = 'rgba(75, 38, 0, .7)'; break;
@@ -203,7 +216,7 @@ function drawCard(context, x, y, card) {
       default: context.fillStyle = 'rgba(75, 75, 75, .7)';
     }
   } else {
-    var hor = cost + 1;
+    var hor = renderSize + 1;
     var vert = hor * 1.5;
     context.moveTo(x, y - vert);
     context.lineTo(x + hor, y);
