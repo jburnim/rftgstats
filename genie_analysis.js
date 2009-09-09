@@ -30,17 +30,21 @@ function LoadImages() {
     }
 }
 
+function GuardFillText(context) {
+    var fillText = function(a, b, c) { };
+    if (context.fillText) {
+	context.font = "12 px sans-serif";
+	fillText = function(a, b, c) { context.fillText(a, b, c) };
+    }
+    return fillText;
+}
 
 function RenderHomeworldGoalData(canvas_id, data) {
     LoadImages();
     window.onload = function() {
 	var canvas = document.getElementById(canvas_id);
 	var context = canvas.getContext('2d');
-	var fillText = function(a, b, c) { };
-	if (context.fillText) {
-	    context.font = "12 px sans-serif";
-	    fillText = function(a, b, c) { context.fillText(a, b, c) };
-	}
+	var fillText = GuardFillText(context); 
 	var base_y = 80;
 	var mul = 300;
 
@@ -101,29 +105,38 @@ function RenderCardWinInfo(data, canvas) {
       location = [], card, x, y;
 
   // Draw axis.
-  context.fillRect(0, 0, 2, height);
-  context.fillRect(0, height - 2, width, 2);
+  context.fillRect(50, 0, 2, height - 25);
+  context.fillRect(50, height - 25, width, 2);
 
   // Compute scales.
-  var maxExpWins = Number.MIN_VALUE, minExpWins = Number.MAX_VALUE, maxWinRate = Number.MIN_VALUE,
-      minWinRate = Number.MAX_VALUE;
+  var maxProbability = Number.MIN_VALUE, minProbability = Number.MAX_VALUE;
+  var maxWinRate = Number.MIN_VALUE, minWinRate = Number.MAX_VALUE;
+      
 
   for (var name in data) {
     card = data[name];
-    maxExpWins = Math.max(maxExpWins, card["exp_wins"]);
-    minExpWins = Math.min(minExpWins, card["exp_wins"]);
+    maxProbability = Math.max(maxProbability, card["probability"]);
+    minProbability = Math.min(minProbability, card["probability"]);
     maxWinRate = Math.max(maxWinRate, card["win_rate"]);
     minWinRate = Math.min(minWinRate, card["win_rate"]);
+  }
+
+  function toCanvasX(prob) {
+      return parseInt((0.1 * width) + prob /
+		      (maxProbability - minProbability) 
+		      * width * 0.8);
+  }
+
+  function toCanvasY(rate) {
+      return parseInt((0.1 * height) + (maxWinRate - rate) /
+		 (maxWinRate - minWinRate) * 0.8 * height);
   }
 
   // Draw dots.
   for (name in data) {
     card = data[name];
-    x = parseInt((0.05 * width) + card["exp_wins"] /
-                                  (maxExpWins - minExpWins) * width * 0.9);
-    y = parseInt((0.05 * height) + (maxWinRate - card["win_rate"]) /
-                                   (maxWinRate - minWinRate) * 0.9 * height);
-
+    x = toCanvasX(card["probability"]);
+    y = toCanvasY(card["win_rate"]);
     if (!location[x]) {
       location[x] = []
     }
@@ -133,6 +146,19 @@ function RenderCardWinInfo(data, canvas) {
     location[x][y].push(name);
 
     drawCard(context, x, y, cardInfo[name]);
+  }
+
+  var fillText = GuardFillText(context);
+  for (var i = 0; i <= 10; ++i) {
+      var cur = i * (maxProbability - minProbability) / 10 + minProbability;
+      var label = ("" + cur).substring(0, 4);
+      fillText(label, toCanvasX(cur), height - 8);
+  }
+
+  for (var i = 0; i <= 10; ++i) {
+      var cur = i * (maxWinRate - minWinRate) / 10 + minWinRate;
+      var label = ("" + cur).substring(0, 4);
+      fillText(label, 0, toCanvasY(cur));
   }
 
   canvas.onclick = function(event) {

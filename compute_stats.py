@@ -65,13 +65,14 @@ This graph shows data by analyzing end game tableaus.
 The x axis is the play rate of the card. 
 <p>
 The y axis on this graph is the conditional winning rate of the card.
-The conditional winning rate of the card given that it was played.
+The conditional winning rate is the winning rate of the card given that it 
+was played.
 <p>
 Strong cards have high winning rates and tend to be played more often.  
 <p>You can click on a card's icon to see its name.
 Cards played as homeworlds are excluded from the data, so that they don't
 totally skew the play rate.  All the analyzed games are using the Gathering 
-Storm expansion so the play rate distribution is fair.
+Storm expansion so the play rate distribution is fair.</p>
 """
 
 HOMEWORLD_WINNING_RATE_DESCRIPTION = """<p>Influence of goal on winning rate
@@ -157,7 +158,7 @@ def ComputeWinningStatsByCardPlayedAndPlayer(games):
 
 class PlayerCardAffinity:
     def __init__(self, games):
-        self.baseline_card_info = ComputeWinningStatsByCardPlayed(games)
+        self.base_card_info = ComputeWinningStatsByCardPlayed(games)
         player_card_info = ComputeWinningStatsByCardPlayedAndPlayer(games)
         rekeyed_player_card_info = collections.defaultdict(lambda: (0.0, 0.0))
         for player_card, card_win_ratio, card_exp_wins in player_card_info:
@@ -174,14 +175,16 @@ class PlayerCardAffinity:
 
     def PlayerVsBaseCardInfo(self, player_name):
         card_diff_info = []
-        for card_name, card_win_ratio, card_exp_wins in self.baseline_card_info:
-            player_card_win_ratio, player_card_exp_wins = self.player_card_info[
-                (player_name, card_name)]
+        for card_name, card_win_ratio, card_exp_wins in self.base_card_info:
+            player_card_win_ratio, player_card_exp_wins = (
+                self.player_card_info[(player_name, card_name)])
+                
             win_ratio_diff = player_card_win_ratio - card_win_ratio
 
             overall_play_ratio = card_exp_wins / self.num_games # wrong
-            player_play_ratio = player_card_exp_wins / self.num_games_by_player[
-                player_name] # also wrong
+            player_play_ratio = player_card_exp_wins / (
+                self.num_games_by_player[player_name]) # also wrong
+                
 
             play_ratio_diff = player_play_ratio - overall_play_ratio
             card_diff_info.append((card_name, win_ratio_diff, play_ratio_diff))
@@ -200,12 +203,27 @@ def Score(result):
 def WinningScore(game):
     return max(Score(result) for result in game['player_list'])
 
+class BucketInfo:
+    def __init__(self, key, win_ratio, expected_wins, frequency):
+        self.key = key
+        self.win_ratio = win_ratio
+        self.expected_wins = expected_wins
+        self.frequency = frequency
+
+    def __getitem__(self, idx):
+        if idx == 0: return self.key
+        elif idx == 1: return self.win_ratio
+        elif idx == 2: return self.expected_wins
+        raise IndexError(idx)
+
+    def __len__(self):
+        return 3
 
 def ComputeWinningStatsByBucket(games, bucketter):
-    """ Returns a list of (bucket_key, win_ratio, exp_wins),
-    sorted by win_ratio"""
+    """ Returns a list of BucketInfo sorted by win_ratio"""
     wins = AccumDict()
     exp_wins = AccumDict()
+    freq = AccumDict()
     for game in games:
         winners = []
         max_score = WinningScore(game)
@@ -220,13 +238,16 @@ def ComputeWinningStatsByBucket(games, bucketter):
         for player_result in game['player_list']:
             for bucket in bucketter(player_result, game):
                 exp_wins.Add(bucket, inv_num_players)
+                freq.Add(bucket, 1)
                 if Score(player_result) == max_score:
                     wins.Add(bucket, inv_num_winners)
 
     win_rates = []
     for bucket in exp_wins:
+        frequency = freq[bucket]
         win_ratio = wins[bucket] / (exp_wins[bucket] or 1.0)
-        win_rates.append((bucket, win_ratio, exp_wins[bucket]))
+        win_rates.append(BucketInfo(bucket, win_ratio, exp_wins[bucket],
+                                    frequency))
 
     win_rates.sort(key = lambda x: -x[1])
     return win_rates
@@ -395,6 +416,9 @@ def EloProbability(r1, r2):
     """Probability that r1 beats r2"""
     return 1 / (1 + 10 ** ((r2 - r1) / 400.0))
 
+def TotalNumTableaus(games):
+    return sum(len(g['player_list']) for g in games)
+
 def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
     def CardSkillYielder(player_result, game):
         skill_info = skill_ratings.GetSkillInfo(player_result['name'])
@@ -406,20 +430,25 @@ def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
 
     grouped_by_card = {}
 
-    for key, win_rate, exp_wins in bucketted_stats:
+    for bucket_info in bucketted_stats:
+        key, win_rate, exp_wins = bucket_info
         card, rating, player_wins, player_exp_wins = key
         if not card in grouped_by_card:
             grouped_by_card[card] = {'weighted_rating': 0.0,
                                      'player_wins': 0.0,
                                      'player_exp_wins': 0.0,
                                      'wins': 0.0,
-                                     'exp_wins': 0.0}
+                                     'exp_wins': 0.0,
+                                     'frequency': 0}
         card_stats = grouped_by_card[card]
         card_stats['weighted_rating'] += rating * exp_wins
         card_stats['player_wins'] += player_wins
         card_stats['player_exp_wins'] += player_exp_wins
         card_stats['wins'] += win_rate * exp_wins
         card_stats['exp_wins'] += exp_wins
+        card_stats['frequency'] += bucket_info.frequency
+
+    total_tableaus = float(TotalNumTableaus(games))
 
     for card in grouped_by_card:
         card_stats = grouped_by_card[card]
@@ -434,6 +463,9 @@ def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
 
         card_stats['win_rate'] = card_stats['wins'] / card_stats['exp_wins']
         del card_stats['wins']
+        
+        card_stats['probability'] = card_stats['frequency'] / total_tableaus
+        del card_stats['frequency']
 
     return grouped_by_card
 
