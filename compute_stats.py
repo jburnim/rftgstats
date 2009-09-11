@@ -34,8 +34,10 @@ GOALS = [
 
 TITLE = 'Masters of Space: Race for the Galaxy Statistics'
 JS_INCLUDE = '<script type="text/javascript" src="genie_analysis.js"></script>'
+CSS = '<link rel="stylesheet" type="text/css" href="style.css" />'
 
-INTRO_BLURB = """<h2>Introduction</h2><p>Hi, welcome to Race for the Galaxy
+INTRO_BLURB = """<h2>Introduction</h2>
+<p>Hi, welcome to Race for the Galaxy
 statistics page by rrenaud, Danny, and Aragos.
 All of the data here is collected from the wonderful
 <a href="http://genie.game-host.org">Genie online Race for the Galaxy server
@@ -46,7 +48,8 @@ project</a>.  These stats look best when viewed with a recent version of
 not show up or be missing text without a new version Firefox. 
 Contributions welcome!</p>
 
-<h3>A brief discussion about <i>Winning Rates</i></h3><p>
+<h3>A brief discussion about <i>Winning Rates</i></h3>
+<p>
 An <i>n</i> player game is worth <i>n</i> points.  The wining rate is the
 number of points accumulated divided by the number of games played.
 Thus, if you win a 4 player game, lose a 3 player game, and lose a 2
@@ -599,6 +602,7 @@ class OverviewStats:
                       '</td><td>Percentage</td></tr>' )
         html = '<a name="overview">'
         html += '<h2>Overview</h2>'
+        html += '<div class="h3">'
         html += 'Total games analyzed: %d<br>\n' % self.games_played
         html += 'Last seen game number: %d<br>\n' % self.max_game_no
         html += header_fmt % 'Player Size'
@@ -611,6 +615,7 @@ class OverviewStats:
             html += '<tr><td>%s</td><td>%d</td><td>%d%%</td></tr>' % (
                 ( d[0], d[1], int( 100. * d[1] / self.games_played )))
         html += '</table>'
+        html += '</div>'
         return html
 
 def PlayerFile(player_name):
@@ -635,7 +640,7 @@ def RenderTopPage(games, rankings_by_game_type):
     top_out = open('output/index.html', 'w')
 
     top_out.write('<html><head><title>' + TITLE + '</title>' + JS_INCLUDE + 
-                  '<head>\n')
+                  CSS + '<head>\n')
 
     top_out.write('<body>')
     top_out.write(INTRO_BLURB)
@@ -653,16 +658,19 @@ def RenderTopPage(games, rankings_by_game_type):
         num_cards_per_name)
 
 
-    top_out.write('\n\n<script type="text/javascript">\n' +
-                  '  var cardInfo = ' + json.dumps(card_info_dict, indent=2) + 
-                  ';\n</script>\n')
+    top_out.write("""
+<script type="text/javascript">
+var cardInfo = %s;
+</script>
+""" % json.dumps(card_info_dict, indent=2))
 
-    top_out.write('\n<canvas id="cardWinInfoCanvas" height="500" width="800"></canvas>\n' +
-                  '<script type="text/javascript">\n' +
-                  '  var cardWinInfo = ' + json.dumps(card_win_info, indent=2) + ';\n' +
-                  '  RenderCardWinInfo(cardWinInfo, \n' +
-                  '      document.getElementById("cardWinInfoCanvas"));\n' +
-                  '</script>\n\n')
+    top_out.write("""
+<canvas id="cardWinInfoCanvas" height="500" width="800"></canvas>
+<script type="text/javascript">
+  var cardWinInfo = %s
+  RenderCardWinInfo(cardWinInfo,document.getElementById("cardWinInfoCanvas"));
+</script>)
+""" % json.dumps(card_win_info, indent=2))
 
     homeworld_goal_analysis = HomeworldGoalAnalysis(games)
     top_out.write(homeworld_goal_analysis.RenderStatsAsHtml());
@@ -790,14 +798,19 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis):
 
     player_out.write('</html>')
 
-def CopySupportFilesToOutput(debugging_on):
-    if os.access('output/genie_analysis.js', os.O_RDONLY):
-        os.remove('output/genie_analysis.js')
+def CopyOrLink(fn, debugging_on):
+    if os.access('output/' + fn, os.O_RDONLY):
+        os.remove('output/' + fn)
     if not debugging_on:
-        shutil.copy('genie_analysis.js', 'output')
+        shutil.copy(fn, 'output')
     else:
-        os.system('ln -s ./../genie_analysis.js output/genie_analysis.js')
+        os.system('ln -s ./../%s output/%s' % (fn, fn))
+    
 
+def CopySupportFilesToOutput(debugging_on):
+    CopyOrLink('genie_analysis.js', debugging_on)
+    CopyOrLink('style.css', debugging_on)
+    
     if not os.access('output/flot', os.O_RDONLY):
         shutil.copytree('flot', 'output/flot')
     if not os.access('output/images', os.O_RDONLY):
