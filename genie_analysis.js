@@ -122,14 +122,14 @@ function RenderCardWinInfo(data, canvas) {
   }
 
   function toCanvasX(prob) {
-      return parseInt((0.1 * width) + prob /
-		      (maxProbability - minProbability) 
-		      * width * 0.8);
+      return parseInt(prob /
+                      (maxProbability - minProbability) 
+                      * width * 0.8);
   }
 
   function toCanvasY(rate) {
       return parseInt((0.1 * height) + (maxWinRate - rate) /
-		 (maxWinRate - minWinRate) * 0.8 * height);
+		      (maxWinRate - minWinRate) * 0.8 * height);
   }
 
   var namesByCost = [];
@@ -161,7 +161,7 @@ function RenderCardWinInfo(data, canvas) {
   context.fillStyle = 'black';
   var fillText = GuardFillText(context);
   for (var i = 0; i <= 10; ++i) {
-      var cur = i * (maxProbability - minProbability) / 10 + minProbability;
+      var cur = i * maxProbability / 10;
       var label = ("" + cur).substring(0, 4);
       fillText(label, toCanvasX(cur), height - 8);
   }
@@ -204,16 +204,16 @@ function RenderCardWinInfo(data, canvas) {
 
 function drawCard(context, x, y, card) {
   context.beginPath();
-  context.fillStyle = 'rgba(220, 220, 70, .8)';
+  context.fillStyle = 'rgba(220, 220, 70, 1.0)';
   var renderSize = parseInt(card["Cost"]) + 1;
   if (card["Type"] == "World") {
     context.arc(x, y, renderSize + 2, 0, Math.PI*2, true);
     switch (card["Goods"]) {
-      case "Novelty": context.fillStyle = 'rgba(0, 192, 255, .7)'; break;
-      case "Rare": context.fillStyle = 'rgba(75, 38, 0, .7)'; break;
-      case "Genes": context.fillStyle = 'rgba(75, 255, 0, .7)'; break;
-      case "Alien": context.fillStyle = 'rgba(200, 200, 30, .7)'; break;
-      default: context.fillStyle = 'rgba(75, 75, 75, .7)';
+      case "Novelty": context.fillStyle = 'rgba(0, 192, 255, .6)'; break;
+      case "Rare": context.fillStyle = 'rgba(75, 38, 0, .6)'; break;
+      case "Genes": context.fillStyle = 'rgba(75, 255, 0, .6)'; break;
+      case "Alien": context.fillStyle = 'rgba(200, 200, 30, .6)'; break;
+      default: context.fillStyle = 'rgba(75, 75, 75, .6)';
     }
   } else {
     var hor = renderSize + 1;
@@ -228,9 +228,9 @@ function drawCard(context, x, y, card) {
   if (card["Military"] == "X"
       || (card["Type"] == "Development"
           && (parseInt(card["Strength"]) > 0 || card["Name"].indexOf("Imperium") > -1))) {
-    context.strokeStyle = 'rgba(255, 0, 0, .8)';
+    context.strokeStyle = 'rgba(255, 0, 0, 1.0)';
   } else {
-    context.strokeStyle = 'rgba(0, 0, 0, .8)';
+    context.strokeStyle = 'rgba(0, 0, 0, 1.0)';
   }
 
   context.closePath();

@@ -69,6 +69,7 @@ def ParseGame(page_contents, card_info):
         print 'could not find status'
         return None
 
+    page_contents = page_contents[:page_contents.find('Comments'):]
     status_list = page_contents.split('Status:')[1:]
 
     for status in status_list:

@@ -32,6 +32,8 @@ GOALS = [
     '3 Aliens',
     ]
 
+DISCARDABLE_CARDS = ['Doomed World', 'Colony Ship', 'New Military Tactics']
+
 TITLE = 'Masters of Space: Race for the Galaxy Statistics'
 JS_INCLUDE = '<script type="text/javascript" src="genie_analysis.js"></script>'
 CSS = '<link rel="stylesheet" type="text/css" href="style.css" />'
@@ -62,28 +64,16 @@ have a winning rate of 1.
 
 WINNING_RATE_VS_PLAY_RATE_DESCRIPTION = """<p>
 <h2>Card winning rate vs play rate</h2>
-<p>
-This graph shows data by analyzing end game tableaus.  
-<p>
-The x axis is the probability that the card will end up in the final tableau, 
-per instance of the card in the deck.
-<p>
-The y axis on this graph is the conditional winning rate of the card.
-The conditional winning rate is the winning rate of the card given that it 
-was played.
-<p>
-Strong cards have high winning rates and tend to be played more often.  
-<p>You can click on a card's icon to see its name.
-Cards played as homeworlds are excluded from the data, so that they don't
+<p>This graph shows data by analyzing end game tableaus. </p>
+<p>Strong cards have high winning rates and tend to be played more often.  
+You can click on a card's icon to see its name.</p>
+<p>Cards played as homeworlds are excluded from the data, so that they don't
 totally skew the play rate.  All the analyzed games are using the Gathering 
 Storm expansion so the play rate distribution is fair.</p>
 """
 
 HOMEWORLD_WINNING_RATE_DESCRIPTION = """<p>Influence of goal on winning rate
-of homeworld.
-<p>The winning rate is a generalization of winning probability that scales
-fairly to multiplayer games with different distribubtions of number of
-players.  
+of homeworld.</p>
 <p>The baseline winning rate of each homeworld is the fat dot.
 The winning rate with the goal is the end of the segment without
 the dot.  Hence, you can tell the absolute rate of winning by the
@@ -92,7 +82,7 @@ end of the line, and the relative change by the magnitude of the line.</p>
 
 
 RATING_BLURB = """<h3>Rating Methodology</h3>
-Each column comes from running an Elo rating algorithm on the appriopriately
+<p>Each column comes from running an Elo rating algorithm on a
 filtered set of games.  The first number is the rating and the second number is
 the percentile for that rating.  To display a rating, 10 2-player games,
 7 3-player, or 5 4-player games are required.
@@ -124,6 +114,23 @@ def Homeworld(player_info):
     if player_info['cards'][0] not in HOMEWORLDS:
         return 'Doomed world'
     return player_info['cards'][0]
+
+def InitCardInfoDict():
+    card_info = list(csv.DictReader(open('card_attributes.csv', 'r')))
+    card_info_dict = dict((x["Name"], x) for x in card_info)
+    return card_info_dict
+
+class CardInfo:
+    card_info_dict = InitCardInfoDict()
+
+    @staticmethod
+    def CardFrequencyInDeck(card_name):
+        card = CardInfo.card_info_dict[card_name]
+        if card['Name'] == 'Contact Specialist':
+            return 3
+        if card['Type'] == 'Development':
+            return 2 - (card['Cost'] == '6')
+        return 1
 
 
 class AccumDict:
@@ -159,47 +166,6 @@ def ComputeWinningStatsByCardPlayedAndPlayer(games):
         for card in player_result['cards']:
             yield player_result['name'], card
     return ComputeWinningStatsByBucket(games, PlayerCardYielder)
-
-class PlayerCardAffinity:
-    def __init__(self, games):
-        self.base_card_info = ComputeWinningStatsByCardPlayed(games)
-        player_card_info = ComputeWinningStatsByCardPlayedAndPlayer(games)
-        rekeyed_player_card_info = collections.defaultdict(lambda: (0.0, 0.0))
-        for player_card, card_win_ratio, card_exp_wins in player_card_info:
-            rekeyed_player_card_info[player_card] = (card_win_ratio,
-                                                     card_exp_wins)
-        self.player_card_info = rekeyed_player_card_info
-
-        self.num_games_by_player = collections.defaultdict(float)
-        for game in games:
-            for player_result in game['player_list']:
-                self.num_games_by_player[player_result['name']] += 1
-
-        self.num_games = float(len(games))
-
-    def PlayerVsBaseCardInfo(self, player_name):
-        card_diff_info = []
-        for card_name, card_win_ratio, card_exp_wins in self.base_card_info:
-            player_card_win_ratio, player_card_exp_wins = (
-                self.player_card_info[(player_name, card_name)])
-                
-            win_ratio_diff = player_card_win_ratio - card_win_ratio
-
-            overall_play_ratio = card_exp_wins / self.num_games # wrong
-            player_play_ratio = player_card_exp_wins / (
-                self.num_games_by_player[player_name]) # also wrong
-                
-
-            play_ratio_diff = player_play_ratio - overall_play_ratio
-            card_diff_info.append((card_name, win_ratio_diff, play_ratio_diff))
-        card_diff_info.sort(key = lambda x: x[1])
-        return card_diff_info
-
-
-def ComputeWinningStatsByPlayer(games):
-    def PlayerYielder(player_result, game):
-        yield player_result['name']
-    return ComputeWinningStatsByBucket(games, PlayerYielder)
 
 def Score(result):
     return result['points'] * 100 + result['goods'] + result['hand']
@@ -423,16 +389,17 @@ def EloProbability(r1, r2):
 def TotalNumTableaus(games):
     return sum(len(g['player_list']) for g in games)
 
-def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings, 
-                                                 num_cards_by_name):
-    def CardSkillYielder(player_result, game):
-        skill_info = skill_ratings.GetSkillInfo(player_result['name'])
-        for idx, card in enumerate(player_result['cards']):
-            if not (idx == 0 and card in HOMEWORLDS):
-                yield (card, skill_info.rating, skill_info.wins, 
-                       skill_info.exp_wins)
-    bucketted_stats = ComputeWinningStatsByBucket(games, CardSkillYielder)
+def FilterDiscardables(mapping):
+    ret = dict(mapping)
+    for card in DISCARDABLE_CARDS:
+        if card in mapping:
+            del ret[card]
+    
+    return ret
 
+def ComputeAdvancedByCardStats(games, skill_info_yielder):
+    bucketted_stats = ComputeWinningStatsByBucket(games, skill_info_yielder)
+    
     grouped_by_card = {}
 
     for bucket_info in bucketted_stats:
@@ -470,10 +437,23 @@ def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings,
         del card_stats['wins']
         
         card_stats['prob_per_card'] = card_stats['frequency'] / (
-            total_tableaus * num_cards_by_name[card])
+            total_tableaus * CardInfo.CardFrequencyInDeck(card))
         del card_stats['frequency']
 
     return grouped_by_card
+    
+
+def ComputeWinningStatsByCardPlayedAndSkillLevel(games, skill_ratings):
+    def NonHomeworldCardSkillYielder(player_result, game):
+        skill_info = skill_ratings.GetSkillInfo(player_result['name'])
+        for idx, card in enumerate(player_result['cards']):
+            if not (idx == 0 and card in HOMEWORLDS or
+                    card == 'Gambling World'):
+                yield (card, skill_info.rating, skill_info.wins, 
+                       skill_info.exp_wins)
+    return FilterDiscardables(ComputeAdvancedByCardStats(
+            games, NonHomeworldCardSkillYielder))
+            
 
 def FilterOutNonGoals(games):
     return [g for g in games if 'goals' in g]
@@ -507,6 +487,7 @@ class HomeworldGoalAnalysis:
                     self.keyed_by_homeworld_goal[(homeworld, goal)] - win_rate)
                 html += '<td>%.3f</td>' % diff
             html += '</tr>\n'
+        html += '</table>\n'
         return html
 
     def RenderToJson(self):
@@ -544,29 +525,6 @@ def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings, card_info):
         for i in range(NUM_SKILL_BUCKETS):
             ret[homeworld].append(keyed_by_bucket[(homeworld, i)])
     return ret
-
-def SixDevRankings(games):
-    card_info = list(csv.DictReader(open('card_attributes.csv', 'r')))
-    dev_6_names = [card['Name'] for card in card_info if card['Cost'] == '6' and
-                   card['Type'] == 'Development']
-
-    winning_stats_by_cards = ComputeWinningStatsByCardPlayed(games)
-    #pprint.pprint(winning_stats_by_cards)
-
-    dev_6_stats = []
-    for by_card_stats in winning_stats_by_cards:
-        if by_card_stats[0] in dev_6_names:
-            dev_6_stats.append(by_card_stats)
-
-    def Utility(card_stat):
-        # Just some approximate way to measure how good a card performed.
-        # The first term is how much your winning rate increases from the
-        # baseline, given that it was played.  It's given a bit more weight
-        # than the second term, which is basically how often the card is played.
-        return -(card_stat[1] - 1.0) * card_stat[2] ** .5
-
-    dev_6_stats.sort(key=Utility)
-    #pprint.pprint(dev_6_stats)
 
 class OverviewStats:
     def __init__(self, games):
@@ -624,17 +582,6 @@ def PlayerFile(player_name):
 def PlayerLink(player_name):
     return '<a href="' + PlayerFile(player_name) + '">' + player_name + '</a>'
 
-def CardsPerName(card_info):
-    ret = {}
-    for card in card_info:
-        if card['Type'] == 'Development':
-            ret[card['Name']] = 2 - (card['Cost'] == '6')
-            if card['Name'] == 'Contact Specialist':
-                ret[card['Name']] = 3
-        else:
-            ret[card['Name']] = 1
-    return ret
-
 def RenderTopPage(games, rankings_by_game_type):
     overview = OverviewStats(games)
     top_out = open('output/index.html', 'w')
@@ -648,38 +595,41 @@ def RenderTopPage(games, rankings_by_game_type):
 
     gathering_storm_games = [g for g in games if g['advanced']]
     top_out.write(WINNING_RATE_VS_PLAY_RATE_DESCRIPTION)
-    top_out.write('From %d Gathering Storm games.<br>\n' %
-                  len(gathering_storm_games))
-    card_info = list(csv.DictReader(open('card_attributes.csv', 'r')))
-    num_cards_per_name = CardsPerName(card_info)
-    card_info_dict = dict((x["Name"], x) for x in card_info)
+    top_out.write('<p>From %d Gathering Storm games.</p><br>\n' %
+                  len(gathering_storm_games))    
     card_win_info = ComputeWinningStatsByCardPlayedAndSkillLevel(
-        gathering_storm_games, rankings_by_game_type.AllGamesRatings(),
-        num_cards_per_name)
-
+        gathering_storm_games, rankings_by_game_type.AllGamesRatings())
 
     top_out.write("""
 <script type="text/javascript">
 var cardInfo = %s;
 </script>
-""" % json.dumps(card_info_dict, indent=2))
+""" % json.dumps(CardInfo.card_info_dict, indent=2))
 
     top_out.write("""
-<canvas id="cardWinInfoCanvas" height="500" width="800"></canvas>
+<p>
+<table><tr><td>Winning Rate</td>
+   <td><canvas id="cardWinInfoCanvas" height="600" width="800"></canvas></td>
+</tr>
+<td></td><td><center>
+Probability of playing (normalized by deck occurrence count)</center></td>
+</tr>
+</table>
 <script type="text/javascript">
-  var cardWinInfo = %s
+  var cardWinInfo = %s;
   RenderCardWinInfo(cardWinInfo,document.getElementById("cardWinInfoCanvas"));
-</script>)
+</script>
+</p>
 """ % json.dumps(card_win_info, indent=2))
 
-    homeworld_goal_analysis = HomeworldGoalAnalysis(games)
-    top_out.write(homeworld_goal_analysis.RenderStatsAsHtml());
-    top_out.write('<h2>Goal Influence</h2>' +
-                  '<h3>Goal Influence Graph</h3>' +
-                  HOMEWORLD_WINNING_RATE_DESCRIPTION +
-                  '<canvas id="homeworld_goal_canvas" height=500 width=800>' +
-                  '</canvas>'
-                  )
+    homeworld_goal_analysis = HomeworldGoalAnalysis(games)    
+    top_out.write("""
+<h2>Goal Influence</h2>
+  <h3>Goal Influence Graph</h3>
+      %s
+<p><canvas id="homeworld_goal_canvas" height=500 width=800>
+</canvas></p>""" % HOMEWORLD_WINNING_RATE_DESCRIPTION)
+            
     top_out.write('<script type="text/javascript">\n' +
                   'var homeworld_goal_data = ' +
                   homeworld_goal_analysis.RenderToJson() + ';\n' +
@@ -687,7 +637,9 @@ var cardInfo = %s;
                   'homeworld_goal_data);\n' +
                   '</script>');
 
-    top_out.write('<h3>Goal Influence Table</h3><table border=1>')
+    top_out.write('<h3>Goal Influence Table</h3><p><table border=1>')
+    top_out.write(homeworld_goal_analysis.RenderStatsAsHtml());
+    
     rankings_by_game_type.RenderAllRankingsAsHTML(top_out)
     top_out.write('</body></html>')
 
