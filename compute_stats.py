@@ -718,6 +718,13 @@ class RankingByGameTypeAnalysis:
         top_out.write('</table>')
 
 
+def KeyGamesByOpponent(target_player, games):
+    ret = collections.defaultdict(list)
+    for game in games:
+        for player in game['player_list']:
+            if player['name'] != target_player:
+                ret[player['name']].append(game)
+    return ret
 
 def RenderPlayerPage(player, player_games, by_game_type_analysis):
     overview = OverviewStats(player_games)
@@ -740,12 +747,15 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis):
 
     player_out.write('</table>')
 
+    paired_games = KeyGamesByOpponent(player, player_games)
+
     player_out.write('<a name="player_flow"> '
                      '<table border=1><tr><td>Opponent</td>'
                      '<td>Net rating flow</td></tr>\n')
-    linked_out = [(PlayerLink(o), s) for o, s in
-                  all_games_ratings.GetRatingFlow(player)]
-    WritePlayerFloatPairsAsTableRows(player_out, linked_out)
+    for opponent, skill_flow in all_games_ratings.GetRatingFlow(player):
+        player_out.write('<tr><td>%s</td><td>%.1f</td>' % (
+                opponent, skill_flow))
+
     player_out.write('</table>')
 
     player_out.write('</html>')

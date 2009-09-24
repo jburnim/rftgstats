@@ -202,18 +202,24 @@ function RenderCardWinInfo(data, canvas) {
   }
 }
 
+NOVELTY = 'rgba(0, 192, 255, .6)';
+RARE = 'rgba(120, 60, 00, .6)';
+GENES = 'rgba(75, 255, 0, .6)';
+ALIEN = 'rgba(200, 200, 30, .6)';
+GRAY = 'rgba(75, 75, 75, .6)';
+
 function drawCard(context, x, y, card) {
   context.beginPath();
-  context.fillStyle = 'rgba(220, 220, 70, 1.0)';
-  var renderSize = parseInt(card["Cost"]) + 1;
+  context.fillStyle = GRAY;
+  var renderSize = parseInt(card["Cost"]) + 2;
   if (card["Type"] == "World") {
     context.arc(x, y, renderSize + 2, 0, Math.PI*2, true);
     switch (card["Goods"]) {
-      case "Novelty": context.fillStyle = 'rgba(0, 192, 255, .6)'; break;
-      case "Rare": context.fillStyle = 'rgba(75, 38, 0, .6)'; break;
-      case "Genes": context.fillStyle = 'rgba(75, 255, 0, .6)'; break;
-      case "Alien": context.fillStyle = 'rgba(200, 200, 30, .6)'; break;
-      default: context.fillStyle = 'rgba(75, 75, 75, .6)';
+      case "Novelty": context.fillStyle = NOVELTY; break;
+      case "Rare": context.fillStyle = RARE; break;
+      case "Genes": context.fillStyle = GENES; break;
+      case "Alien": context.fillStyle = ALIEN; break;
+    default: context.fillStyle = GRAY;
     }
   } else {
     var hor = renderSize + 1;
@@ -223,6 +229,22 @@ function drawCard(context, x, y, card) {
     context.lineTo(x, y + vert);
     context.lineTo(x - hor, y);
     context.lineTo(x, y - vert);
+    switch (card["Name"]) {
+    case "Free Trade Association":
+    case "Consumer Markets":
+	context.fillStyle = NOVELTY; break;
+    case "Mining League":
+    case "Mining Conglomerate":
+    case "Mining Robots":
+	context.fillStyle = RARE; break;
+    case "Galactic Genome Project":
+    case "Genetics Lab":
+    case "Pan-galactic League":
+	context.fillStyle = GENES; break;
+    case "Alien Tech Institute":
+	context.fillStyle = ALIEN; break;
+
+    }
   }
 
   if (card["Military"] == "X"
@@ -236,6 +258,15 @@ function drawCard(context, x, y, card) {
   context.closePath();
   context.fill();
   context.stroke();
+
+  if (card["Production"] == "Windfall") {
+      context.beginPath();
+      context.arc(x, y, renderSize / 2, 0, Math.PI * 2, true);
+      context.fillStyle = 'rgba(255, 255, 255, 1.0)';
+      context.closePath();
+      context.fill();
+      context.stroke();
+  }
 }
 
 function createPopup(x, y, text) {
@@ -273,18 +304,3 @@ function findPos(obj) {
     return [curleft,curtop];
   }
 }
-
-/*
-window.onload = function() {
-    hide_images();
-    var elem = document.getElementById('myCanvas');
-
-    if (elem && elem.getContext) {
-	var context = elem.getContext('2d');
-
-	if (context) {
-	    RenderHomeworldData(context, data);
-	}
-    }
-}
-*/
