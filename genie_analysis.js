@@ -24,7 +24,7 @@ var homeworld_colors = {'Alpha Centauri': '#663300',
 
 function LoadImages() {
     for (var i = 0; i < img_ids.length; ++i) {
-	var new_img = Image();
+	var new_img = new Image();
 	new_img.src = 'images/' + img_ids[i] + '.png';
 	imgs.push(new_img);
     }

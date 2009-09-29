@@ -560,6 +560,7 @@ class OverviewStats:
                       '</td><td>Percentage</td></tr>' )
         html = '<a name="overview">'
         html += '<h2>Overview</h2>'
+        html += '</a>'
         html += '<div class="h3">'
         html += 'Total games analyzed: %d<br>\n' % self.games_played
         html += 'Last seen game number: %d<br>\n' % self.max_game_no
@@ -567,7 +568,7 @@ class OverviewStats:
         for size in self.player_size:
             html += '<tr><td>%s</td><td>%d</td><td>%d%%</td></tr>' % (
                 ( size[0], size[1], int( 100. * size[1] / self.games_played )))
-        html += '</table border=1><table>'
+        html += '</table border=1>'
         html += header_fmt % 'Game Type'
         for d in self.race_type:
             html += '<tr><td>%s</td><td>%d</td><td>%d%%</td></tr>' % (
@@ -587,7 +588,7 @@ def RenderTopPage(games, rankings_by_game_type):
     top_out = open('output/index.html', 'w')
 
     top_out.write('<html><head><title>' + TITLE + '</title>' + JS_INCLUDE + 
-                  CSS + '<head>\n')
+                  CSS + '</head>\n')
 
     top_out.write('<body>')
     top_out.write(INTRO_BLURB)
@@ -611,6 +612,7 @@ var cardInfo = %s;
 <table><tr><td>Winning Rate</td>
    <td><canvas id="cardWinInfoCanvas" height="600" width="800"></canvas></td>
 </tr>
+<tr>
 <td></td><td><center>
 Probability of playing (normalized by deck occurrence count)</center></td>
 </tr>
@@ -637,7 +639,7 @@ Probability of playing (normalized by deck occurrence count)</center></td>
                   'homeworld_goal_data);\n' +
                   '</script>');
 
-    top_out.write('<h3>Goal Influence Table</h3><p><table border=1>')
+    top_out.write('<h3>Goal Influence Table</h3><p>')
     top_out.write(homeworld_goal_analysis.RenderStatsAsHtml());
     
     rankings_by_game_type.RenderAllRankingsAsHTML(top_out)
@@ -800,4 +802,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
