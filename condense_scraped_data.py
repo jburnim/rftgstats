@@ -50,6 +50,8 @@ def ParseGame(page_contents, card_info):
     page_contents = page_contents.replace('<br/>', '<br>')
     version_loc = page_contents.index(': Game #')
     version_with_context = page_contents[version_loc-50:version_loc + 50]
+    # This definitely fails for some games, some non-exp games have exp
+    # cards.  Use a better heuristic.
     is_exp = 'Gathering Storm' in version_with_context
     using_goals = False
     goals = set()
