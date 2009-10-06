@@ -70,6 +70,11 @@ You can click on a card's icon to see its name.</p>
 <p>Cards played as homeworlds are excluded from the data, so that they don't
 totally skew the play rate.  All the analyzed games are using the Gathering 
 Storm expansion so the play rate distribution is fair.</p>
+<p>The absolute play rate is divided by the number of instances of the card
+in the deck, so investment credits is divided by 2, and contact specialist
+is divided by 3.  By doing so, cheap developments do not dominate the play
+frequency.</p>
+<p>
 """
 
 HOMEWORLD_WINNING_RATE_DESCRIPTION = """<p>Influence of goal on winning rate
@@ -155,12 +160,6 @@ def ComputeWinningStatsByHomeworld(games):
         yield Homeworld(player_result)
     return ComputeWinningStatsByBucket(games, HomeworldYielder)
 
-def ComputeWinningStatsByCardPlayed(games):
-    def CardYielder(player_result, game):
-        for card in player_result['cards']:
-            yield card
-    return ComputeWinningStatsByBucket(games, CardYielder)
-
 def ComputeWinningStatsByCardPlayedAndPlayer(games):
     def PlayerCardYielder(player_result, game):
         for card in player_result['cards']:
@@ -173,44 +172,45 @@ def Score(result):
 def WinningScore(game):
     return max(Score(result) for result in game['player_list'])
 
-class BucketInfo:
-    def __init__(self, key, win_ratio, expected_wins, frequency):
-        self.key = key
-        self.win_ratio = win_ratio
-        self.expected_wins = expected_wins
-        self.frequency = frequency
-
-    def __getitem__(self, idx):
-        if idx == 0: return self.key
-        elif idx == 1: return self.win_ratio
-        elif idx == 2: return self.expected_wins
-        raise IndexError(idx)
-
-    def __len__(self):
-        return 3
-
-def ComputeWinningStatsByBucket(games, bucketter):
+def ComputeWinningStatsByBucket(games, bucketter, rating_system = None):
     """ Returns a list of BucketInfo sorted by win_ratio"""
     wins = AccumDict()
     exp_wins = AccumDict()
+    norm_exp_wins = AccumDict()
     freq = AccumDict()
-    for game in games:
-        winners = []
-        max_score = WinningScore(game)
+    for game in FilterOutTies(games):
+        winners = GameWinners(game)
+        assert len(winners) == 1
         inv_num_players = 1.0 / len(game['player_list'])
+        inv_num_winners = 1.0 / len(winners)
 
-        num_winning_players = 0
+        lose_probs = {}
+        winner_name = winners[0]['name']
+
+        game_no = game['game_no']
         for player_result in game['player_list']:
-            if Score(player_result) == max_score:
-                num_winning_players += 1
-        inv_num_winners = 1.0 / num_winning_players
-
+            player_name = player_result['name']
+            if rating_system:
+                lose_probs[player_name] = (
+                    rating_system.ProbBeatWinnerAtGameNo(game_no, player_name))
+            else:
+                # If no rating_system given, norm_win_rate will be identical
+                # to win_rate.
+                lose_probs[player_name] = 1.0 / len(game['player_list'])
+                                                         
         for player_result in game['player_list']:
             for bucket in bucketter(player_result, game):
                 exp_wins.Add(bucket, inv_num_players)
                 freq.Add(bucket, 1)
-                if Score(player_result) == max_score:
+                        
+                if player_result['name'] == winner_name:
                     wins.Add(bucket, inv_num_winners)
+                    norm_exp_wins.Add(bucket,
+                                      len(game) - 1 - sum(lose_probs.values()))
+                else:
+                    norm_exp_wins.Add(bucket,
+                                      lose_probs[player_result['name']])
+
 
     win_rates = []
     for bucket in exp_wins:
@@ -296,18 +296,26 @@ class SkillRatings:
 	self.rating_by_homeworld_flow = collections.defaultdict(
             lambda: collections.defaultdict(int))
         self.model_log_loss = 0.0
+        self.ratings_at_game_no = collections.defaultdict(dict)
+        self.prob_beat_winner = collections.defaultdict(dict)
 
         for game in FilterOutTies(games):
             winner = GameWinners(game)[0]
             win_name = winner['name']
             losers = []
             for player in game['player_list']:
-                if player['name'] == win_name:
+                player_name = player['name']
+                rating = self.GetSkillInfo(player_name).rating
+                game_no = game['game_no']
+                self.ratings_at_game_no[game_no][player_name] = rating
+                if player_name == win_name:
                     continue
                 loser_name = player['name']
                 win_prob = self.skill_model.Predict(win_name, loser_name)
+                self.prob_beat_winner[game_no][loser_name] = win_prob
                 self.model_log_loss += math.log(win_prob) / math.log(2)
                 losers.append(loser_name)
+
 
             delta = self.skill_model.AdjustRatings(win_name, losers)
             for player_name in delta:
@@ -323,6 +331,8 @@ class SkillRatings:
 
                 if win_name == player_name:
                     continue
+                # This symettry is wrong for rating systems which are more
+                # general than Elo.
                 self.rating_flow[win_name][player_name] -= delta[player_name]
                 self.rating_flow[player_name][win_name] += delta[player_name]
 
@@ -339,6 +349,12 @@ class SkillRatings:
 
     def GetHomeworldSkillFlow(self, name):
 	return SortDictByKeys(self.rating_by_homeworld_flow[name])
+
+    def RatingAtGameNo(self, game_no, player):
+        return self.ratings_at_game_no[game_no][player]
+
+    def ProbBeatWinnerAtGameNo(self, game_no, loser):
+        return self.prob_beat_winner[game_no][loser]
 
     def HasPlayer(self, name):
         return name in self.ranking_percentile
@@ -397,6 +413,30 @@ def FilterDiscardables(mapping):
     
     return ret
 
+
+class BucketInfo:
+    def __init__(self, key, win_ratio, expected_wins, frequency):
+        self.key = key
+        self.win_ratio = win_ratio
+        self.expected_wins = expected_wins
+        self.frequency = frequency
+
+    def __getitem__(self, idx):
+        if idx == 0: return self.key
+        elif idx == 1: return self.win_ratio
+        elif idx == 2: return self.expected_wins
+        raise IndexError(idx)
+
+    def __len__(self):
+        return 3
+
+
+class CardBucketInfo:
+    def __init__(self):
+        pass
+        
+# this has the overly non-general assumption that the card is the key, rather
+# than simply a part of the key
 def ComputeAdvancedByCardStats(games, skill_info_yielder):
     bucketted_stats = ComputeWinningStatsByBucket(games, skill_info_yielder)
     
@@ -614,7 +654,7 @@ var cardInfo = %s;
 </tr>
 <tr>
 <td></td><td><center>
-Probability of playing (normalized by deck occurrence count)</center></td>
+Probability instance of card appears on tableau</center></td>
 </tr>
 </table>
 <script type="text/javascript">
@@ -682,9 +722,11 @@ class RankingByGameTypeAnalysis:
                 self.filters, self.filt_game_lists):
                 if filter_func(game):
                     filt_list.append(game)
-        self.rating_systems = [SkillRatings(games, EloSkillModel(BASE_SKILL,
-                                            MOVEMENT_CONST)) for games in
-                               self.filt_game_lists]
+
+        self.rating_systems = [
+            SkillRatings(games, EloSkillModel(BASE_SKILL, MOVEMENT_CONST))
+            for games in self.filt_game_lists]
+
         #for i in [5, 7, 10, 15]:
         #    print i, SkillRatings(games, EloSkillModel(BASE_SKILL, i)).ModelPerformance()
 
@@ -756,7 +798,7 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis):
                      '<td>Net rating flow</td></tr>\n')
     for opponent, skill_flow in all_games_ratings.GetRatingFlow(player):
         player_out.write('<tr><td>%s</td><td>%.1f</td>' % (
-                opponent, skill_flow))
+                PlayerLink(opponent), skill_flow))
 
     player_out.write('</table>')
 
