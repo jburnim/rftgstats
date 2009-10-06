@@ -46,9 +46,9 @@ All of the data here is collected from the wonderful
 </a>.  The code that computes this information is open source and available
 at <a href="http://code.google.com/p/rftgstats">the rftgstats google code
 project</a>.  These stats look best when viewed with a recent version of 
-<a href="http://mozilla.org">Firefox 3</a>.  In particular, some graphs may
-not show up or be missing text without a new version Firefox. 
-Contributions welcome!</p>
+<a href="http://mozilla.org">Firefox 3</a> or <a
+href="http://www.google.com/chrome">Chrome</a>.  Contributions
+welcome!</p>
 
 <h3>A brief discussion about <i>Winning Rates</i></h3>
 <p>
