@@ -217,7 +217,7 @@ def ComputeWinningStatsByBucket(games, bucketter, rating_system = None):
         frequency = freq[bucket]
         win_ratio = wins[bucket] / (exp_wins[bucket] or 1.0)
         win_rates.append(BucketInfo(bucket, win_ratio, exp_wins[bucket],
-                                    frequency))
+                                    norm_exp_wins[bucket], frequency))
 
     win_rates.sort(key = lambda x: -x[1])
     return win_rates
@@ -415,11 +415,12 @@ def FilterDiscardables(mapping):
 
 
 class BucketInfo:
-    def __init__(self, key, win_ratio, expected_wins, frequency):
+    def __init__(self, key, win_ratio, expected_wins, norm_exp_wins, frequency):
         self.key = key
         self.win_ratio = win_ratio
         self.expected_wins = expected_wins
         self.frequency = frequency
+        self.norm_exp_wins = norm_exp_wins
 
     def __getitem__(self, idx):
         if idx == 0: return self.key
@@ -451,6 +452,7 @@ def ComputeAdvancedByCardStats(games, skill_info_yielder):
                                      'player_exp_wins': 0.0,
                                      'wins': 0.0,
                                      'exp_wins': 0.0,
+                                     'norm_exp_wins': 0.0,
                                      'frequency': 0}
         card_stats = grouped_by_card[card]
         card_stats['weighted_rating'] += rating * exp_wins
@@ -458,6 +460,7 @@ def ComputeAdvancedByCardStats(games, skill_info_yielder):
         card_stats['player_exp_wins'] += player_exp_wins
         card_stats['wins'] += win_rate * exp_wins
         card_stats['exp_wins'] += exp_wins
+        card_stats['norm_exp_wins'] += bucket_info.norm_exp_wins
         card_stats['frequency'] += bucket_info.frequency
 
     total_tableaus = float(TotalNumTableaus(games))
@@ -473,6 +476,8 @@ def ComputeAdvancedByCardStats(games, skill_info_yielder):
         del card_stats['player_wins']
         del card_stats['player_exp_wins']
 
+        card_stats['norm_win_rate'] = (card_stats['wins'] /
+                                       card_stats['norm_exp_wins'])
         card_stats['win_rate'] = card_stats['wins'] / card_stats['exp_wins']
         del card_stats['wins']
         

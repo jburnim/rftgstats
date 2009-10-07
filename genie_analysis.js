@@ -117,8 +117,8 @@ function RenderCardWinInfo(data, canvas) {
     var card = data[name];
     maxProbability = Math.max(maxProbability, card["prob_per_card"]);
     minProbability = Math.min(minProbability, card["prob_per_card"]);
-    maxWinRate = Math.max(maxWinRate, card["win_rate"]);
-    minWinRate = Math.min(minWinRate, card["win_rate"]);
+    maxWinRate = Math.max(maxWinRate, card["norm_win_rate"]);
+    minWinRate = Math.min(minWinRate, card["norm_win_rate"]);
   }
 
   function toCanvasX(prob) {
@@ -146,7 +146,7 @@ function RenderCardWinInfo(data, canvas) {
     var name = namesByCost[i];
     card = data[name];
     x = toCanvasX(card["prob_per_card"]);
-    y = toCanvasY(card["win_rate"]);
+    y = toCanvasY(card["norm_win_rate"]);
     if (!location[x]) {
       location[x] = []
     }
