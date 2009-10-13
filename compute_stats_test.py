@@ -57,7 +57,7 @@ class ComputeWinningStatsByBucketTest(unittest.TestCase):
             games, CardYielder, MockRatingSystem())
         BucketInfo = compute_stats.BucketInfo
         expected_buckets = [
-            BucketInfo("Earth's Lost Colony", 2.5, 5./6,
+            BucketInfo("Earth's Lost Colony", 2.5, 2, (.5 + .8) * 3/2 + 
                   
             
 
