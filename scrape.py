@@ -1,28 +1,19 @@
 import urllib2
 import os
 import time
-import condense_scraped_data
-
-def GameComplete(file_name):
-    class MockInfo:
-        def __getitem__(self, key):
-            return {'exp. 1': True, 'name': 'foo'}
-    return condense_scraped_data.ParseGame(open(file_name, 'r').read(),
-                                           MockInfo()) != None
 
 if __name__ == '__main__':
-    for i in range(41000, 44000):
+    games = eval(open('condensed_games.json', 'r').read())
+    completed_game_nums = set([int(g['game_no']) for g in games])
+    for i in range(41000, 42000):
         try:
             url_name = 'game.htm?gid=%d' % i
             url = 'http://genie.game-host.org/' + url_name
             output_file_name = 'data/' + url_name
             dead_name = output_file_name + '.dead'
-            if os.path.exists(output_file_name):
-                completed = GameComplete(output_file_name)
-                print output_file_name, 'exists, completed?', completed
-                if completed:
-                    print 'skipped because complete', output_file_name
-                    continue
+            if i in completed_game_nums:
+                print 'skipped because complete', i
+                continue
             if os.path.exists(dead_name):
                 print 'skipping', output_file_name, 'because dead'
                 continue

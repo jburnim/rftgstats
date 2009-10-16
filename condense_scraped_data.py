@@ -46,12 +46,11 @@ def ParseGoals(snip_with_goals):
     return ret
 
 
-def ParseGame(page_contents, card_info):
+def ParseGame(page_contents, card_id_to_name, card_name_to_version):
     page_contents = page_contents.replace('<br/>', '<br>')
     version_loc = page_contents.index(': Game #')
     version_with_context = page_contents[version_loc-50:version_loc + 50]
-    # This definitely fails for some games, some non-exp games have exp
-    # cards.  Use a better heuristic.
+
     is_exp = 'Gathering Storm' in version_with_context
     using_goals = False
     goals = set()
@@ -64,8 +63,7 @@ def ParseGame(page_contents, card_info):
     
     #print 'using goals?', using_goals
     ret = {'player_list': [], 
-           'game_no': int(GAME_NUM_RE.search(version_with_context).group(1)),
-           'expansion': int(is_exp)}
+           'game_no': int(GAME_NUM_RE.search(version_with_context).group(1))}
 
     if 'Status:' not in page_contents:
         print 'could not find status'
@@ -105,8 +103,11 @@ def ParseGame(page_contents, card_info):
             if img[0] == 'g':
                 won_goals.append(GOAL_NUM_TO_NAME[int(img[1:])])
             else:
-                card_data = card_info[img]
-                cards.append(card_data['name'])
+                card_data = card_id_to_name[img]
+                card_name = card_data['name']
+                cards.append(card_name)
+                if 'Gathering' in card_name_to_version[card_name]:
+                    is_exp = True
             
         player_result['cards'] = cards
         if using_goals:
@@ -128,16 +129,22 @@ def ParseGame(page_contents, card_info):
 
     ret['advanced'] = int('Action1:' in page_contents and
                           'Action2:' in page_contents)
-
+    ret['expansion'] = int(is_exp)
     return ret
 
 if __name__ == '__main__':
-    card_info = csv.DictReader(open('card_names.csv', 'r'))
+    card_id_to_name = csv.DictReader(open('card_names.csv', 'r'))
     cards_by_id = {}
-    for row in card_info:
+
+    for row in card_id_to_name:
         id_line = row['BGG img number ID']
         card_id = ALL_DIGITS.search(id_line).group()
         cards_by_id[card_id] = row
+
+    card_attrs = csv.DictReader(open('card_attributes.csv', 'r'))
+    card_name_to_version = {}
+    for row in card_attrs:
+        card_name_to_version[row['Name']] = row['Release']
 
     games = []
     error_sources = []
@@ -149,7 +156,7 @@ if __name__ == '__main__':
             if game_data_fn.endswith('dead'): 
                 continue
             game = ParseGame(open('data/' + game_data_fn, 'r').read(), 
-                             cards_by_id)
+                             cards_by_id, card_name_to_version)
             if game and len(game['player_list']):
                 games.append(game)
         except BogusGoalNum, e:

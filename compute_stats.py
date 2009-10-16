@@ -305,21 +305,6 @@ class MultiSkillModelProbProd(EloSkillModel):
                     
         return NormalizeProbs(ret)
 
-class MultiSkillModelOddsProdProb(EloSkillModel):
-    def __init__(self, base_rating, move_const):
-        EloSkillModel.__init__(self, base_rating, move_const)
-
-    def MultiplayerWinProb(self, player_list):
-        ret = []
-        for idx, player1 in enumerate(player_list):
-            ret.append(.5)
-            for player2 in player_list:
-                if player1 != player2:
-                    ret[idx] = (ret[idx] *
-                                ProbToOdds(self.Predict(player1, player2)))
-                    
-        return NormalizeProbs([OddsToProb(o) for o in ret])
-
 class SkillRatings:
     def __init__(self, games, skill_model):
         self.skill_model = skill_model
@@ -727,13 +712,6 @@ class RankingByGameTypeAnalysis:
         self.rating_systems = [
             SkillRatings(games, EloSkillModel(BASE_SKILL, MOVEMENT_CONST))
             for games in self.filt_game_lists]
-
-        for i in [5, 7, 10, 15]:
-            base_prob_model = MultiSkillModelProbProd(BASE_SKILL, i)
-            base_odds_model = MultiSkillModelOddsProdProb(BASE_SKILL, i)
-            
-            print 'prob', i, SkillRatings(games, base_prob_model).winner_pred_log_loss
-            print 'odds', i, SkillRatings(games, base_odds_model).winner_pred_log_loss 
 
     def AllGamesRatings(self):
         return self.rating_systems[0]
