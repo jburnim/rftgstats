@@ -6,14 +6,16 @@ import compute_stats
 class ComputeWinningStatsByBucketTest(unittest.TestCase):
     def testFoo(self):
 
-        def CardYielder(player_result):
+        def CardYielder(player_result, game):
             for card in player_result['cards']:
                 yield card
 
         class MockRatingSystem:
-            def ProbBeatWinnerAtGameNo(self, game_no, player_name):
-                return {('fairgr', 7): .5,
+            def ProbWonAtGameNo(self, game_no, player_name):
+                return {('rrenaud', 7): .4,
+                        ('fairgr', 7): .4,
                         ('kingcong', 7): .2,
+                        ('rrenaud', 8): .4,
                         ('Kesterer', 8): .6}[(player_name, game_no)]
 
         games = [{'game_no': 7,
@@ -54,30 +56,38 @@ class ComputeWinningStatsByBucketTest(unittest.TestCase):
             for p in g['player_list']:
                 p['goods'] = 0
                 p['hand'] = 0
+
+        n1r = .4 * 3
+        n1f = .4 * 3
+        n1k = .2 * 3
+        n2r = .4 * 2
+        n2k = .6 * 2
+        expected_buckets = {
+            "Earth's Lost Colony": (5, n1r + n2r, 2),
+            "Alien Toy Shop":      (3, n1r      , 1),
+            "Plague World":        (2, n2r      , 1),
+            "New Sparta":          (0, n1f + n2k, 2),
+            "Alien Robot Sentry":  (0, n1f      , 1),
+            "Genetics Lab":        (0, n1f      , 1),
+            "Doomed World":        (0, n1k      , 1),
+            "Contact Specialist":  (0, n1k      , 1),
+            "Investment Credits":  (0, n1k      , 1),
+            "New Economy":         (0, n2k      , 1),
+            "New Vineland":        (0, n2k      , 1),
+        }
+
         win_buckets = compute_stats.ComputeWinningStatsByBucket(
             games, CardYielder, MockRatingSystem())
-        BInfo = compute_stats.BucketInfo
-        n1r = (.5 + .8) * 3./2
-        n2r = .4 * 2.0
-        n1f = (.5 + .8) * 3./2
-        n1k = .2 * .3 / 2
-        n2k = .6 * 2.0
-        expected_buckets = {
-            "Earth's Lost Colony": (5, 2, n1r + n2r, 2),
-            "Alien Toy Shop":      (3, 1, n1r      , 1),
-            "Plague World":        (2, 1, n2r      , 1),
-            "New Sparta":          (0, 2, n1f + n2k, 2),
-            "Alien Robot Sentry":  (0, 1, n1f      , 1),
-            "Genetics Lab":        (0, 1, n1f      , 1),
-            "Doomed World":        (0, 1, n1k      , 1),
-            "Contact Specialist":  (0, 1, n1k      , 1),
-            "Investment Credits":  (0, 1, n1k      , 1),
-            "New Economy":         (0, 1, n2k      , 1),
-            "New Vineland":        (0, 1, n2k      , 1),
-        }
+
+        self.assertEquals(len(win_buckets), len(expected_buckets))
+        win_buckets_keys = set([b.key for b in win_buckets])
+        self.assertEquals(set(expected_buckets.keys()), win_buckets_keys)
         for bucket in win_buckets:
-            self.expectTrue(win_bucket.key() in expected_buckets)
-            
+            self.assertTrue(bucket.key in expected_buckets)
+            expected_bucket = expected_buckets[bucket.key]
+            self.assertEquals(expected_bucket[0], bucket.win_points)
+            self.assertEquals(expected_bucket[1], bucket.norm_exp_win_points)
+            self.assertEquals(expected_bucket[2], bucket.frequency)
 
 if __name__ == '__main__':
     unittest.main()

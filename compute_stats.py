@@ -169,49 +169,38 @@ def WinningScore(game):
 def ComputeWinningStatsByBucket(games, bucketter, rating_system = None):
     """ Returns a list of BucketInfo sorted by win_rate"""
     wins = AccumDict()
-    exp_wins = AccumDict()
     norm_exp_wins = AccumDict()
     freq = AccumDict()
     for game in FilterOutTies(games):
         winners = GameWinners(game)
         assert len(winners) == 1
-        inv_num_players = 1.0 / len(game['player_list'])
-        inv_num_winners = 1.0 / len(winners)
 
-        lose_probs = {}
+        won_game_prob = {}
         winner_name = winners[0]['name']
 
         game_no = game['game_no']
+        n = float(len(game['player_list']))
         for player_result in game['player_list']:
             player_name = player_result['name']
             if rating_system:
-                lose_probs[player_name] = (
-                    rating_system.ProbBeatWinnerAtGameNo(game_no, player_name))
+                won_game_prob[player_name] = (
+                    rating_system.ProbWonAtGameNo(game_no, player_name))
             else:
-                # If no rating_system given, norm_win_rate will be identical
-                # to win_rate.
-                lose_probs[player_name] = 1.0 / len(game['player_list'])
-                                                         
+                won_game_prob[player_name] = 1.0 / n
+ 
         for player_result in game['player_list']:
             for key in bucketter(player_result, game):
-                exp_wins.Add(key, inv_num_players)
                 freq.Add(key, 1)
-                        
+                norm_exp_wins.Add(
+                    key, n * won_game_prob[player_result['name']])
                 if player_result['name'] == winner_name:
-                    wins.Add(key, inv_num_winners)
-                    norm_exp_wins.Add(key,
-                                      len(game) - 1 - sum(lose_probs.values()))
-                else:
-                    norm_exp_wins.Add(key,
-                                      lose_probs[player_result['name']])
+                    wins.Add(key, n)
 
 
     win_rates = []
-    for bucket in exp_wins:
-        frequency = freq[bucket]
-        win_rate = wins[bucket] / (exp_wins[bucket] or 1.0)
-        win_rates.append(BucketInfo(bucket, win_rate, exp_wins[bucket],
-                                    norm_exp_wins[bucket], frequency))
+    for bucket in norm_exp_wins:
+        win_rates.append(BucketInfo(
+                bucket, wins[bucket], norm_exp_wins[bucket], freq[bucket]))
 
     win_rates.sort(key = lambda x: -x.win_rate)
     return win_rates
@@ -284,12 +273,6 @@ class EloSkillModel:
 def NormalizeProbs(prob_list):
     s = sum(prob_list)
     return [i / s for i in prob_list]
-
-def ProbToOdds(p):
-    return p / (1 - p)
-
-def OddsToProb(o):
-    return o / (1 + o)
 
 class MultiSkillModelProbProd(EloSkillModel):
     def __init__(self, base_rating, move_const):
@@ -374,11 +357,14 @@ class SkillRatings:
     def GetHomeworldSkillFlow(self, name):
 	return SortDictByKeys(self.rating_by_homeworld_flow[name])
 
-    def RatingAtGameNo(self, game_no, player):
-        return self.ratings_at_game_no[game_no][player]
-
-    def ProbBeatWinnerAtGameNo(self, game_no, loser):
-        return self.prob_beat_winner[game_no][loser]
+    def WinProportionAtGameNo(self, game_no, player):
+        ret = 1.0
+        for other_player in self.ratings_at_game_no[game_no]:
+            if other_player == player:
+                continue
+            ret *= EloProbability(self.ratings_at_game_no[player],
+                                  self.ratings_at_game_no[other_player])
+        return ret
 
     def HasPlayer(self, name):
         return name in self.ranking_percentile
@@ -437,14 +423,12 @@ def FilterDiscardables(mapping):
     return ret
 
 class BucketInfo:
-    def __init__(self, key, win_points, expected_win_points,
-                 norm_exp_win_points, frequency):
+    def __init__(self, key, win_points, norm_exp_win_points, frequency):
         self.key = key
         self.win_points = win_points
-        self.win_rate = win_points / expected_win_points
-        self.expected_wins = expected_win_points
+        self.win_rate = win_points / frequency
         self.frequency = frequency
-        self.norm_exp_wins = norm_exp_win_points
+        self.norm_exp_win_points = norm_exp_win_points
         self.norm_win_rate = win_points / norm_exp_win_points
         
 # this has the overly non-general assumption that the card is the key, rather
