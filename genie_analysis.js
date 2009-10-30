@@ -105,10 +105,6 @@ function RenderCardWinInfo(data, canvas) {
   var context = canvas.getContext("2d"), height = canvas.height, width = canvas.width,
       location = [], card, x, y;
 
-  // Draw axis.
-  context.fillRect(50, 0, 2, height - 25);
-  context.fillRect(50, height - 25, width, 2);
-
   // Compute scales.
   var maxProbability = Number.MIN_VALUE, minProbability = Number.MAX_VALUE;
   var maxWinRate = Number.MIN_VALUE, minWinRate = Number.MAX_VALUE;
@@ -142,6 +138,34 @@ function RenderCardWinInfo(data, canvas) {
 	      parseInt(cardInfo[nameB]['Cost']);
       });
 
+  var lowestBand = minProbability * minWinRate;
+  var highestBand = maxProbability * maxWinRate;
+  var NUM_BANDS = 10;
+  var DETAIL = 200;
+
+  var fillText = GuardFillText(context);
+  context.strokeStyle = 'rgba(120, 120, 120, .5)';
+  context.fillStyle = 'rgba(120, 120, 120, .5)';
+  context.textAlign = 'center';
+  for (var i = 0; i < NUM_BANDS; ++i) {
+      context.beginPath();
+
+      var curBand = lowestBand + i * (highestBand - lowestBand) / NUM_BANDS;
+      context.moveTo(toCanvasX(minProbability), 
+		     toCanvasY(curBand / minProbability));
+      for (var j = 0; j < DETAIL; ++j) {
+	  var curProb = minProbability + 
+	      j * (maxProbability - minProbability) / DETAIL;
+	  var curWin = curBand / curProb;
+	  context.lineTo(toCanvasX(curProb), toCanvasY(curWin));
+      }
+      context.stroke();
+      var targetHeight = maxWinRate * .95;
+      fillText(("" + curBand).substr(0, 4), 
+	       toCanvasX(curBand / targetHeight), 
+	       toCanvasY(targetHeight));
+  }
+
   // Draw dots.
   for (var i = 0; i < namesByCost.length; ++i) {
     var name = namesByCost[i];
@@ -158,19 +182,18 @@ function RenderCardWinInfo(data, canvas) {
 
     drawCard(context, x, y, cardInfo[name]);
   }
-
   context.fillStyle = 'black';
-  var fillText = GuardFillText(context);
+  context.textAlign = 'start';
   for (var i = 0; i <= 10; ++i) {
       var cur = i * maxProbability / 10;
       var label = ("" + cur).substring(0, 4);
-      fillText(label, toCanvasX(cur), height - 8);
+      fillText(label, toCanvasX(parseFloat(label)), height - 8);
   }
 
   for (var i = 0; i <= 10; ++i) {
       var cur = i * (maxWinRate - minWinRate) / 10 + minWinRate;
       var label = ("" + cur).substring(0, 4);
-      fillText(label, 0, toCanvasY(cur));
+      fillText(label, 10, toCanvasY(parseFloat(label)));
   }
 
   canvas.onclick = function(event) {

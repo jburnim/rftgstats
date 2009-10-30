@@ -34,8 +34,9 @@ GOALS = [
 
 DISCARDABLE_CARDS = ['Doomed World', 'Colony Ship', 'New Military Tactics']
 
-TITLE = 'Masters of Space: Race for the Galaxy Statistics'
-JS_INCLUDE = '<script type="text/javascript" src="genie_analysis.js"></script>'
+TITLE = 'RFTGStats.com: Race for the Galaxy Statistics'
+JS_INCLUDE = ('<script type="text/javascript" src="genie_analysis.js"></script>'
+              '<script type="text/javascript" src="card_attrs.js"></script>')
 CSS = '<link rel="stylesheet" type="text/css" href="style.css" />'
 
 INTRO_BLURB = """<h2>Introduction</h2>
@@ -117,7 +118,7 @@ def Homeworld(player_info):
     # This misclassifes initial doomed world settles that are other homeworlds.
     # I doubt that happens all that often though.
     if player_info['cards'][0] not in HOMEWORLDS:
-        return 'Doomed world'
+        return 'Doomed World'
     return player_info['cards'][0]
 
 def InitCardInfoDict():
@@ -631,12 +632,6 @@ def PlayerLink(player_name):
 
 def RenderCardWinGraph(out_file, card_win_info):
     out_file.write("""
-<script type="text/javascript">
-var cardInfo = %s;
-</script>
-""" % json.dumps(CardInfo.card_info_dict, indent=2))
-
-    out_file.write("""
 <p>
 <table><tr><td>Winning Rate</td>
    <td><canvas id="cardWinInfoCanvas" height="600" width="800"></canvas></td>
@@ -835,7 +830,6 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis):
                 PlayerLink(opponent), skill_flow))
 
     player_out.write('</table>')
-
     player_out.write('</html>')
 
 def CopyOrLink(fn, debugging_on):
@@ -848,6 +842,10 @@ def CopyOrLink(fn, debugging_on):
     
 
 def CopySupportFilesToOutput(debugging_on):
+    open('card_attrs.js', 'w').write('var cardInfo = %s;' % 
+                                     json.dumps(CardInfo.card_info_dict, 
+                                                indent=2))
+    CopyOrLink('card_attrs.js', debugging_on)
     CopyOrLink('genie_analysis.js', debugging_on)
     CopyOrLink('style.css', debugging_on)
     
