@@ -5,7 +5,7 @@ import time
 if __name__ == '__main__':
     games = eval(open('condensed_games.json', 'r').read())
     completed_game_nums = set([int(g['game_no']) for g in games])
-    for i in range(42000, 50000):
+    for i in range(1, 55500):
         try:
             url_name = 'game.htm?gid=%d' % i
             url = 'http://genie.game-host.org/' + url_name
