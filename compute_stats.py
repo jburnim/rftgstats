@@ -785,11 +785,44 @@ def SoloGameFromPlayerResult(game, name):
 
 def KeyGamesByOpponent(target_player, games):
     ret = collections.defaultdict(list)
-    for game in games:
+    for game in games[::-1]:
         for player in game['player_list']:
             if player['name'] != target_player:
                 ret[player['name']].append(game)
     return ret
+
+TIE_COLOR = '#444444'
+WIN_COLOR = 'green'
+LOSE_COLOR = 'red'
+
+def AbbrevHomeworld(homeworld_name):
+    return ''.join(x[0] for x in homeworld_name.split())
+
+def RenderTableauShort(player_result):
+    abbrev_homeworld = AbbrevHomeworld(Homeworld(player_result))
+    return '%s-%d' % (abbrev_homeworld, int(player_result['points']))
+                      
+
+def RenderGameWithPerspective(game, source, target):
+    for player_result in game['player_list']:
+        if player_result['name'] == source:
+            source_result = player_result
+        elif player_result['name'] == target:
+            target_result = player_result
+    
+    if source_result['win_points'] == len(game['player_list']):
+        color = WIN_COLOR
+    elif source_result['win_points'] == 0 and target_result['win_points'] > 0:
+        color = LOSE_COLOR
+    else:
+        color = TIE_COLOR
+
+    return ('<a href="http://genie.game-host.org/game.htm?gid=%d">' +
+            '<font color="%s">' + 
+            '%s %s</font></a>') % (game['game_no'], color,
+                                   RenderTableauShort(source_result),
+                                   RenderTableauShort(target_result))
+    
 
 def RenderPlayerPage(player, player_games, by_game_type_analysis):
     overview = OverviewStats(player_games)
@@ -828,6 +861,12 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis):
     for opponent, skill_flow in all_games_ratings.GetRatingFlow(player):
         player_out.write('<tr><td>%s</td><td>%.1f</td>' % (
                 PlayerLink(opponent), skill_flow))
+        for game in paired_games[opponent]:
+            player_out.write('<td>')
+            player_out.write(RenderGameWithPerspective(game, player, opponent))
+            player_out.write('</td>')
+        player_out.write('</tr>')
+            
 
     player_out.write('</table>')
     player_out.write('</html>')
