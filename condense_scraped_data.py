@@ -132,7 +132,7 @@ def ParseGame(page_contents, card_id_to_name, card_name_to_version):
     ret['expansion'] = int(is_exp)
     return ret
 
-if __name__ == '__main__':
+def main():
     card_id_to_name = csv.DictReader(open('card_names.csv', 'r'))
     cards_by_id = {}
 
@@ -169,3 +169,6 @@ if __name__ == '__main__':
     print 'games with known errors', known_errors
     json.dump(games, open('condensed_games.json', 'w'), indent=True)
     json.dump(games, gzip.GzipFile('condensed_games.json.gz', 'w'))
+
+if __name__ == '__main__':
+    main()

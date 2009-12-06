@@ -48,7 +48,8 @@ All of the data here is collected from the wonderful
 at <a href="http://code.google.com/p/rftgstats">the rftgstats google code
 project</a>.  These stats look best when viewed with a recent version of 
 <a href="http://mozilla.org">Firefox 3</a> or <a
-href="http://www.google.com/chrome">Chrome</a>.  Contributions
+href="http://www.google.com/chrome">Chrome</a>.  The raw data from genie is
+available <a href="condensed_games.json">here</a>. Contributions
 welcome!</p>
 
 <h3>A brief discussion about <i>Winning Rates</i></h3>
@@ -887,6 +888,7 @@ def CopySupportFilesToOutput(debugging_on):
     CopyOrLink('card_attrs.js', debugging_on)
     CopyOrLink('genie_analysis.js', debugging_on)
     CopyOrLink('style.css', debugging_on)
+    CopyOrLink('condensed_games.json', debugging_on)
     
     if not os.access('output/flot', os.O_RDONLY):
         shutil.copytree('flot', 'output/flot')
@@ -899,9 +901,9 @@ def main():
         debugging_on = True
 
     if debugging_on:
-        games = eval(open('terse_games.json').read())
+        games = simplejson.loads(open('terse_games.json').read())
     else:
-        games = eval(open('condensed_games.json').read())
+        games = simplejson.loads(open('condensed_games.json').read())
         open('terse_games.json', 'w').write(str(random.sample(games, 1000)))
 
     LabelGamesWithWinPoints(games)
