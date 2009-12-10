@@ -140,11 +140,11 @@ class CardInfo:
         return 1
 
 
-class AccumDict:
+class MeanVarDict:
     def __init__(self):
         self._accum = {}
 
-    def Add(self, key, val):
+    def AddEvent(self, key, val):
         if key not in self._accum:
             self._accum[key] = 0.0
         self._accum[key] += val
@@ -179,9 +179,9 @@ def LabelGamesWithWinPoints(games):
 
 def ComputeWinningStatsByBucket(games, bucketter, rating_system = None):
     """ Returns a list of BucketInfo sorted by win_rate"""
-    wins = AccumDict()
-    norm_exp_wins = AccumDict()
-    freq = AccumDict()
+    wins = MeanVarDict()
+    norm_exp_wins = MeanVarDict()
+    freq = MeanVarDict()
     for game in FilterOutTies(games):
         game_no = game['game_no']
         n = float(len(game['player_list']))
@@ -194,9 +194,9 @@ def ComputeWinningStatsByBucket(games, bucketter, rating_system = None):
                 won_prob = 1.0 / n
 
             for key in bucketter(player_result, game):
-                freq.Add(key, 1)
-                norm_exp_wins.Add(key, n * won_prob)
-                wins.Add(key, player_result['win_points'])
+                freq.AddEvent(key, 1)
+                norm_exp_wins.AddEvent(key, n * won_prob)
+                wins.AddEvent(key, player_result['win_points'])
 
 
     win_rates = []
@@ -901,9 +901,9 @@ def main():
         debugging_on = True
 
     if debugging_on:
-        games = simplejson.loads(open('terse_games.json').read())
+        games = json.loads(open('terse_games.json').read())
     else:
-        games = simplejson.loads(open('condensed_games.json').read())
+        games = json.loads(open('condensed_games.json').read())
         open('terse_games.json', 'w').write(str(random.sample(games, 1000)))
 
     LabelGamesWithWinPoints(games)

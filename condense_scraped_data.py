@@ -31,6 +31,9 @@ class BogusGoalNum(Exception):
     def __init__(self, msg):
         Exception.__init__(self, msg)
 
+class CompleteButRejectedGame(Exception):
+    pass
+
 def ParseGoals(snip_with_goals):
     avail_goal_chunks = snip_with_goals.split('rftg/')[1:]
     ret = []
@@ -59,15 +62,13 @@ def ParseGame(page_contents, card_id_to_name, card_name_to_version):
         snip_with_goals = page_contents[version_loc - 50:end_goal_loc]
         goals.update(ParseGoals(snip_with_goals))
         using_goals = True
-        print 'found using goals'
-    
-    #print 'using goals?', using_goals
+
     ret = {'player_list': [], 
            'game_no': int(GAME_NUM_RE.search(version_with_context).group(1))}
 
     if 'Status:' not in page_contents:
         print 'could not find status'
-        return None
+        raise CompleteButRejectedGame()
 
     page_contents = page_contents[:page_contents.find('Comments'):]
     status_list = page_contents.split('Status:')[1:]
@@ -77,9 +78,11 @@ def ParseGame(page_contents, card_id_to_name, card_name_to_version):
         status_lines = status.split('<br>')
         if len(status_lines) < 3:
             print 'confused, could not under status lines', status_lines
-        is_game_end = status_lines[0]
-        if 'Game End' not in is_game_end:
-            print "Don't think game is over"
+        game_end_line = status_lines[0]
+        if 'Game End' not in game_end_line:
+            if 'Frozen' in game_end_line:
+                raise CompleteButRejectedGame()
+            print "Don't think game", ret['game_no'] ,"is over"
             return None
         
         name_points = status_lines[1]
@@ -87,8 +90,7 @@ def ParseGame(page_contents, card_id_to_name, card_name_to_version):
         player_result['points'] = int(POINTS_RE.search(name_points).group(1))
         player_result['chips'] = int(CHIPS_RE.search(name_points).group(1))
         if player_result['points'] <= 5:
-            print "Don't think this game is legit..", player_result['name'], player_result['points']
-            return None
+            raise CompleteButRejectedGame()
                     
         card_goal_list_line = status_lines[2]
         card_goal_list_imgs = card_goal_list_line.split('src=')
@@ -118,7 +120,7 @@ def ParseGame(page_contents, card_id_to_name, card_name_to_version):
 
     if len(ret['player_list']) <= 1:
         print 'insufficient players'
-        return None
+        raise CompleteButRejectedGame()
 
     if using_goals:
         ret['goals'] = list(goals)
@@ -151,16 +153,25 @@ def main():
     known_errors = []
     data_sources = os.listdir('data')
     for game_data_fn in data_sources:
+        write_dead = False
         try:
             print game_data_fn
-            if game_data_fn.endswith('dead'): 
+            if game_data_fn.endswith('dead'):
                 continue
-            game = ParseGame(open('data/' + game_data_fn, 'r').read(), 
+
+            full_game_fn = 'data/' + game_data_fn
+            game = ParseGame(open(full_game_fn, 'r').read(), 
                              cards_by_id, card_name_to_version)
             if game and len(game['player_list']):
                 games.append(game)
         except BogusGoalNum, e:
             known_errors.append(game_data_fn)
+            write_dead = True
+        except CompleteButRejectedGame:
+            print 'Rejecting', game_data_fn
+            write_dead = True
+        if write_dead:
+            open(full_game_fn + '.dead', 'w')
         #except Exception, e:
         #    error_sources.append(game_data_fn)
         #    print 'error', e, game_data_fn
@@ -168,7 +179,9 @@ def main():
     print 'games with errors', error_sources
     print 'games with known errors', known_errors
     json.dump(games, open('condensed_games.json', 'w'), indent=True)
-    json.dump(games, gzip.GzipFile('condensed_games.json.gz', 'w'))
+    gzip.GzipFile('condensed_games.json.gz', 'w').write(
+        open('condensed_games.json', 'r').read())
+    
 
 if __name__ == '__main__':
     main()

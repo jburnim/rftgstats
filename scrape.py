@@ -72,8 +72,9 @@ def main():
     print 'on going games are', ongoing_game_nums
 
     completed_game_nums = ReadCompletedGameNos()
+    num_retrieved = 0
 
-    for i in xrange(max(ongoing_game_nums), 10000, -1):
+    for i in xrange(max(ongoing_game_nums), 60000, -1):
         try:
             if i in completed_game_nums:
                 print 'skipped because complete', i
@@ -92,13 +93,15 @@ def main():
 
             time.sleep(20)
             url_file = urllib2.urlopen(url)
+            num_retrieved += 1
             open(output_file_name, 'w').write(url_file.read())
             print 'wrote', output_file_name
         except Exception, e:
             print 'error', e, 'skipping game ', i, 'at', url
             open(dead_name, 'w').write('')
 
-    condense_scraped_data.main()
+    print 'pulled down ', num_retrieved, 'new games'
+    # condense_scraped_data.main()
 
 if __name__ == '__main__':
     main()
