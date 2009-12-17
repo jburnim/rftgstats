@@ -139,23 +139,33 @@ class CardInfo:
             return 2 - (card['Cost'] == '6')
         return 1
 
+FREQ, SUM, SUM_SQUARED = range(3)
 
 class MeanVarDict:
+    
     def __init__(self):
-        self._accum = {}
+        self.freq_s_s2 = collections.defaultdict(lambda : [0, 0.0, 0.0])
 
     def AddEvent(self, key, val):
-        if key not in self._accum:
-            self._accum[key] = 0.0
-        self._accum[key] += val
+        event_summary = self.freq_s_s2[key]
+        event_summary[FREQ] += 1
+        event_summary[SUM] += val
+        event_summary[SUM_SQUARED] += val * val
 
-    def __getattr__(self, key):
-        return getattr(self._accum, key)
+    def Frequency(self, key):
+        return self.freq_s_s2[key][FREQ]
 
-    def __getitem__(self, key):
-        if key not in self._accum:
-            self._accum[key] = 0.0
-        return self._accum[key]
+    def Mean(self, key):
+        data = self.freq_s_s2[key]
+        return data[SUM] / data[FREQ]
+
+    def Variance(self, key):
+        freq, s, s2 = self.freq_s_s2[key]
+        return (s2 - (s ** 2) / n) / (n - 1)
+
+    def __iter__(self):
+        return iter(self.freq_s_s2)
+        
 
 def ComputeWinningStatsByHomeworld(games):
     def HomeworldYielder(player_result, game):

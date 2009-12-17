@@ -113,7 +113,7 @@ class ComputeWinningStatsByBucketTest(unittest.TestCase):
             self.assertEquals(expected_bucket[1], bucket.norm_exp_win_points)
             self.assertEquals(expected_bucket[2], bucket.frequency)
 
-class ComputeByCardStats(unittest.TestCase):
+class ComputeByCardStatsTest(unittest.TestCase):
     def CompareValWithMsg(self, val1, val2, msg):
         expanded_msg = '%f != %f <%s>' % (val1, val2, msg)
         self.assertEquals(val1, val2, expanded_msg)
@@ -143,6 +143,16 @@ class ComputeByCardStats(unittest.TestCase):
                                    (FREQUENCY_DICT[card_name] * TOTAL_TABLEAUS),
                                    card_stats[card_name]["prob_per_card"],
                                    base_msg)
+
+class MeanVarDictTest(unittest.TestCase):
+    def testSimple(self):
+        d = compute_stats.MeanVarDict()
+        d.AddEvent('a', 4)
+        d.AddEvent('a', 16)
+        d.AddEvent('a', 13)
+        d.AddEvent('a', 7)
+        self.assertEquals(d.Frequency('a'), 4)
+        # var should be ~= 29.3333
 
 if __name__ == '__main__':
     unittest.main()

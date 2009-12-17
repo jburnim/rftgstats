@@ -74,7 +74,7 @@ def main():
     completed_game_nums = ReadCompletedGameNos()
     num_retrieved = 0
 
-    for i in xrange(max(ongoing_game_nums), 60000, -1):
+    for i in xrange(max(ongoing_game_nums), max(ongoing_game_nums) - 10000, -1):
         try:
             if i in completed_game_nums:
                 print 'skipped because complete', i
