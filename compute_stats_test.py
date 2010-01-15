@@ -47,24 +47,30 @@ def GameList():
     return games
 
 def ExpectedBuckets():
-    n1r = .4 * 3
-    n1f = .4 * 3
+    n1r = .3 * 3
+    n1f = .5 * 3
     n1k = .2 * 3
     n2r = .4 * 2
     n2k = .6 * 2
+    
+    # ELC norm win rate.
+    # 2. / n1r == 3/.9 = 3.3333,
+    # 3. / n2r == 2/.8 = 2.5
+    # 3.333 + 2.5 ~= 2.91
+
     return {
-        "Earth's Lost Colony": (5, n1r + n2r, 2),
-        "Alien Toy Shop":      (3, n1r      , 1),
-        "Interstellar Bank":   (3, n1r      , 1),
-        "Plague World":        (2, n2r      , 1),
-        "New Sparta":          (0, n1f + n2k, 2),
-        "Alien Robot Sentry":  (0, n1f      , 1),
-        "Genetics Lab":        (0, n1f      , 1),
-        "Doomed World":        (0, n1k      , 1),
-        "Contact Specialist":  (0, n1k      , 1),
-        "Investment Credits":  (0, n1k      , 1),
-        "New Economy":         (0, n2k      , 1),
-        "New Vinland":         (0, n2k      , 1),
+        "Earth's Lost Colony": ((2 + 3) / 2., (3. / n1r + 2. / n2r) / 2, 2),
+        "Alien Toy Shop":      (3, 3. /n1r                  , 1),
+        "Interstellar Bank":   (3, 3. /n1r                  , 1),
+        "Plague World":        (2, 2. /n2r      , 1),
+        "New Sparta":          (0, (0. / n1f + 0./ n2k) / 1 , 2),
+        "Alien Robot Sentry":  (0, 0. / n1f                 , 1),
+        "Genetics Lab":        (0, 0. / n1f                 , 1),
+        "Doomed World":        (0, 0. / n1k                 , 1),
+        "Contact Specialist":  (0, 0. / n1k                 , 1),
+        "Investment Credits":  (0, 0. / n1k                 , 1),
+        "New Economy":         (0, 0. / n2k                 , 1),
+        "New Vinland":         (0, 0. / n2k                 , 1),
     }
 
 TOTAL_TABLEAUS = 5
@@ -86,8 +92,8 @@ FREQUENCY_DICT = {
 
 class MockRatingSystem():
     def ProbWonAtGameNo(self, game_no, player_name):
-        return {('rrenaud', 7): .4,
-                ('fairgr', 7): .4,
+        return {('rrenaud', 7): .3,
+                ('fairgr', 7): .5,
                 ('kingcong', 7): .2,
                 ('rrenaud', 8): .4,
                 ('Kesterer', 8): .6}[(player_name, game_no)]
@@ -97,7 +103,13 @@ def CardYielder(player_result, game):
     for card in player_result['cards']:
         yield card
 
-class ComputeWinningStatsByBucketTest(unittest.TestCase):
+class BaseTestCase(unittest.TestCase):
+    def CompareValWithMsg(self, val1, val2, msg):
+        expanded_msg = '%f != %f <%s>' % (val1, val2, msg)
+        self.assertEquals(val1, val2, expanded_msg)
+
+
+class ComputeWinningStatsByBucketTest(BaseTestCase):
     def testComputeWinningStatsByBucketTest(self):
         win_buckets = compute_stats.ComputeWinningStatsByBucket(
             GameList(), CardYielder, MockRatingSystem())
@@ -108,16 +120,15 @@ class ComputeWinningStatsByBucketTest(unittest.TestCase):
         self.assertEquals(set(expected_buckets.keys()), win_buckets_keys)
         for bucket in win_buckets:
             self.assertTrue(bucket.key in expected_buckets)
+            msg = bucket.key
             expected_bucket = expected_buckets[bucket.key]
-            self.assertEquals(expected_bucket[0], bucket.win_points)
-            self.assertEquals(expected_bucket[1], bucket.norm_exp_win_points)
-            self.assertEquals(expected_bucket[2], bucket.frequency)
+            self.CompareValWithMsg(expected_bucket[0], bucket.win_points, msg)
+            self.CompareValWithMsg(expected_bucket[1], bucket.norm_win_points, 
+                                   msg)
+            self.CompareValWithMsg(expected_bucket[2], bucket.frequency, msg)
 
-class ComputeByCardStatsTest(unittest.TestCase):
-    def CompareValWithMsg(self, val1, val2, msg):
-        expanded_msg = '%f != %f <%s>' % (val1, val2, msg)
-        self.assertEquals(val1, val2, expanded_msg)
-
+class ComputeByCardStatsTest(BaseTestCase):
+    
     def testComputeWinningStatsByCard(self):
         card_stats = compute_stats.ComputeWinningStatsByCardPlayed(
             GameList(), MockRatingSystem())
@@ -131,12 +142,11 @@ class ComputeByCardStatsTest(unittest.TestCase):
             self.assertTrue(card_name in nonhw_keys)
 
             self.CompareValWithMsg(expected_buckets[card_name][0],
-                                   card_stats[card_name]["win_rate"],
+                                   card_stats[card_name]["win_points"],
                                    base_msg)
 
-            self.CompareValWithMsg(expected_buckets[card_name][0] / 
-                                   expected_buckets[card_name][1],
-                                   card_stats[card_name]["norm_win_rate"],
+            self.CompareValWithMsg(expected_buckets[card_name][1],
+                                   card_stats[card_name]["norm_win_points"],
                                    base_msg)
 
             self.CompareValWithMsg(expected_buckets[card_name][2] / 
@@ -144,15 +154,31 @@ class ComputeByCardStatsTest(unittest.TestCase):
                                    card_stats[card_name]["prob_per_card"],
                                    base_msg)
 
-class MeanVarDictTest(unittest.TestCase):
+class RandomVariableObserver(unittest.TestCase):
     def testSimple(self):
-        d = compute_stats.MeanVarDict()
-        d.AddEvent('a', 4)
-        d.AddEvent('a', 16)
-        d.AddEvent('a', 13)
-        d.AddEvent('a', 7)
-        self.assertEquals(d.Frequency('a'), 4)
-        # var should be ~= 29.3333
+        d = compute_stats.RandomVariableObserver()
+        d.AddOutcome(4)  # 10 - 4 = 6, 6^2 = 36
+        d.AddOutcome(16) # 16 - 10 = 6, 6^2 = 36
+        d.AddOutcome(13) # 13 - 10 = 3, 3^2 = 9
+        d.AddOutcome(7)  # 10 - 7 = 3, 3^2 = 9
+        #  36 + 36 + 9 + 9 = 90, 90 / 3 = 30
+        self.assertEquals(d.Frequency(), 4)
+        self.assertEquals(d.Mean(), 10)
+        self.assertEquals(d.Variance(), 30.0)
+
+class TestLabelGameWithWinPoints(unittest.TestCase):
+    def testTie(self):
+        player_list = [
+                {'name': 'rrenaud', 'points': 20, 'goods': 0, 'hand': 0}, 
+                {'name': 'suboptimalrob', 'points': 19, 'goods': 0, 'hand': 0},
+                {'name': 'fairgr', 'points': 20, 'goods': 0, 'hand': 0}
+                ]
+        g = {'player_list': player_list}
+        compute_stats.LabelGameWithWinPoints(g)
+        correct_points = {'rrenaud': 1.5, 'suboptimalrob': 0, 'fairgr': 1.5}
+        for p in player_list:
+            self.assertEquals(p['win_points'], correct_points[p['name']])
+
 
 if __name__ == '__main__':
     unittest.main()

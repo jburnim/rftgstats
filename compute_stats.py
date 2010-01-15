@@ -108,10 +108,6 @@ start time),
 rather than game end time, as Genie does.  Since there are some players who game
 the Genie system, I suspect this method may be slightly more accurate simply
 because players do not have much of an incentive to game it.</li>
-<li>The ratings lag genie by some amount, often by days or so.
-<font size=-1>Eventually, I'll also fix this, making it lag only a few minutes.
-</font>
-</li>
 </ul>
 """
 
@@ -141,32 +137,31 @@ class CardInfo:
 
 FREQ, SUM, SUM_SQUARED = range(3)
 
-class MeanVarDict:
-    
+class RandomVariableObserver:
     def __init__(self):
-        self.freq_s_s2 = collections.defaultdict(lambda : [0, 0.0, 0.0])
+        self.freq = 0
+        self.sum = 0.0
+        self.sum_sq = 0.0
 
-    def AddEvent(self, key, val):
-        event_summary = self.freq_s_s2[key]
-        event_summary[FREQ] += 1
-        event_summary[SUM] += val
-        event_summary[SUM_SQUARED] += val * val
+    def AddOutcome(self, val):
+        self.freq += 1
+        self.sum += val
+        self.sum_sq += val * val
 
-    def Frequency(self, key):
-        return self.freq_s_s2[key][FREQ]
+    def Frequency(self):
+        return self.freq
 
-    def Mean(self, key):
-        data = self.freq_s_s2[key]
-        return data[SUM] / data[FREQ]
+    def Mean(self):
+        return self.sum / (self.freq or 1)
 
-    def Variance(self, key):
-        freq, s, s2 = self.freq_s_s2[key]
-        return (s2 - (s ** 2) / n) / (n - 1)
+    def Variance(self):
+        if self.freq <= 1:
+            return 1e10
+        return (self.sum_sq - (self.sum ** 2) / self.freq) / (self.freq - 1)
 
-    def __iter__(self):
-        return iter(self.freq_s_s2)
+    def SampleStdDev(self):
+        return (self.Variance() / self.freq) ** .5
         
-
 def ComputeWinningStatsByHomeworld(games):
     def HomeworldYielder(player_result, game):
         yield Homeworld(player_result)
@@ -178,20 +173,23 @@ def Score(result):
 def WinningScore(game):
     return max(Score(result) for result in game['player_list'])
 
+def LabelGameWithWinPoints(game):
+    n = float(len(game['player_list']))
+    for player_result in game['player_list']:
+        player_result['win_points'] = 0.0
+        winners = GameWinners(game)
+    for player_result in winners:
+        player_result['win_points'] = n / len(winners)
+
 def LabelGamesWithWinPoints(games):
     for game in games:
-        n = float(len(game['player_list']))
-        for player_result in game['player_list']:
-            player_result['win_points'] = 0.0
-        winners = GameWinners(game)
-        for player_result in winners:
-            player_result['win_points'] = n / len(winners)
+        LabelGameWithWinPoints(game)
 
 def ComputeWinningStatsByBucket(games, bucketter, rating_system = None):
-    """ Returns a list of BucketInfo sorted by win_rate"""
-    wins = MeanVarDict()
-    norm_exp_wins = MeanVarDict()
-    freq = MeanVarDict()
+    """ Returns a list of BucketInfo sorted by win_points"""
+    wins = collections.defaultdict(RandomVariableObserver)
+    norm_wins = collections.defaultdict(RandomVariableObserver)
+
     for game in FilterOutTies(games):
         game_no = game['game_no']
         n = float(len(game['player_list']))
@@ -204,18 +202,20 @@ def ComputeWinningStatsByBucket(games, bucketter, rating_system = None):
                 won_prob = 1.0 / n
 
             for key in bucketter(player_result, game):
-                freq.AddEvent(key, 1)
-                norm_exp_wins.AddEvent(key, n * won_prob)
-                wins.AddEvent(key, player_result['win_points'])
+                norm_wins[key].AddOutcome(player_result['win_points'] / (
+                        n * won_prob))
+                wins[key].AddOutcome(player_result['win_points'])
 
 
-    win_rates = []
-    for bucket in norm_exp_wins:
-        win_rates.append(BucketInfo(
-                bucket, wins[bucket], norm_exp_wins[bucket], freq[bucket]))
+    bucket_infos = []
+    for bucket in norm_wins:
+        bucket_infos.append(BucketInfo(
+                bucket, wins[bucket].Mean(), wins[bucket].SampleStdDev(), 
+                norm_wins[bucket].Mean(), norm_wins[bucket].SampleStdDev(), 
+                wins[bucket].Frequency()))
 
-    win_rates.sort(key = lambda x: -x.win_rate)
-    return win_rates
+    bucket_infos.sort(key = lambda x: -x.win_points)
+    return bucket_infos
 
 def GameTied(game):
     return len(GameWinners(game)) > 1
@@ -471,13 +471,15 @@ def FilterDiscardables(mapping):
     return ret
 
 class BucketInfo:
-    def __init__(self, key, win_points, norm_exp_win_points, frequency):
+    def __init__(self, key, 
+                 win_points, win_points_ssd, 
+                 norm_win_points, norm_win_points_ssd, frequency):
         self.key = key
         self.win_points = win_points
-        self.win_rate = win_points / frequency
+        self.win_points_var = win_points_ssd
         self.frequency = frequency
-        self.norm_exp_win_points = norm_exp_win_points
-        self.norm_win_rate = win_points / norm_exp_win_points
+        self.norm_win_points = norm_win_points
+        self.norm_win_points_ssd = norm_win_points_ssd
         
 # this has the overly non-general assumption that the card is the key, rather
 # than simply a part of the key
@@ -490,8 +492,9 @@ def ComputeByCardStats(games, card_yielder, skill_ratings):
     for bucket_info in bucketted_stats:
         card = bucket_info.key
         grouped_by_card[card] = {
-            'win_rate': bucket_info.win_rate,
-            'norm_win_rate': bucket_info.norm_win_rate,
+            'win_points': bucket_info.win_points,
+            'norm_win_points': bucket_info.norm_win_points,
+            'norm_win_points_ssd': bucket_info.norm_win_points_ssd,
             'prob_per_card': (bucket_info.frequency / (total_tableaus * 
                               CardInfo.CardFrequencyInDeck(card)))
                               }
@@ -521,7 +524,7 @@ class HomeworldGoalAnalysis:
             games, HomeworldGoalYielder)
         self.keyed_by_homeworld_goal = {}
         for bucket in self.bucketted_by_homeworld_goal:
-            self.keyed_by_homeworld_goal[bucket.key] = bucket.win_rate
+            self.keyed_by_homeworld_goal[bucket.key] = bucket.win_points
 
         self.bucketted_by_homeworld = ComputeWinningStatsByHomeworld(games)
 
@@ -534,11 +537,11 @@ class HomeworldGoalAnalysis:
 
         for bucket_info in self.bucketted_by_homeworld:
             homeworld = bucket_info.key
-            win_rate = bucket_info.win_rate
-            html += '<tr><td>%s</td><td>%.3f</td>' % (homeworld, win_rate)
+            win_points = bucket_info.win_points
+            html += '<tr><td>%s</td><td>%.3f</td>' % (homeworld, win_points)
             for goal in GOALS:
                 diff = (
-                    self.keyed_by_homeworld_goal[(homeworld, goal)] - win_rate)
+                    self.keyed_by_homeworld_goal[(homeworld, goal)] - win_points)
                 html += '<td>%.3f</td>' % diff
             html += '</tr>\n'
         html += '</table>\n'
@@ -549,7 +552,7 @@ class HomeworldGoalAnalysis:
         for bucket_info in self.bucketted_by_homeworld:
             homeworld = bucket_info.key
             ret.append({'homeworld': homeworld,
-                        'win_rate': bucket_info.win_rate,
+                        'win_points': bucket_info.win_points,
                         'adjusted_rate': []})
             for goal in GOALS:
                 ret[-1]['adjusted_rate'].append(
@@ -574,7 +577,7 @@ def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings, card_info):
                                                   HomeworldSkillYielder)
     keyed_by_hw_rough_skill = {}
     for bucket in bucketted_stats:
-        keyed_by_hw_rough_skill[bucket.key] = (bucket.win_rate,
+        keyed_by_hw_rough_skill[bucket.key] = (bucket.win_points,
                                                bucket.expected_wins)
     print keyed_by_hw_rough_skill
     ret = {}
@@ -660,6 +663,30 @@ Probability instance of card appears on tableau</center></td>
 """ % json.dumps(card_win_info, indent=2))
     
 
+def AdjustedWinPoints(cardWinInfo):
+    observed_norm_win_points = []
+
+    for card in cardWinInfo:
+        c = cardWinInfo[card]
+        norm_win_points_per_game = c['prob_per_card'] * c['norm_win_points']
+        c['norm_win_points_per_game'] = norm_win_points_per_game
+        if (CardInfo.card_info_dict[card]['Production'] == 'Production' and
+            not card in HOMEWORLDS):
+            observed_norm_win_points.append((card, c))
+        if card == 'Plague World':
+            plague_world_info  = c
+    observed_norm_win_points.sort(key = lambda x: 
+                                  x[1]['norm_win_points_per_game'])
+    mean = sum(c[1]['norm_win_points_per_game'] for c in 
+               observed_norm_win_points) / len(observed_norm_win_points)
+
+    print 'mean = %f' % mean
+    print 'name'.ljust(25), 'norm_ppg'.ljust(10)
+    for per_card_info in observed_norm_win_points:
+        print per_card_info[0].ljust(25), ('%.3f' % per_card_info[1]['norm_win_points_per_game']).ljust(20), per_card_info[1]['norm_win_points']
+    
+    
+
 def RenderTopPage(games, rankings_by_game_type):
     overview = OverviewStats(games)
     top_out = open('output/index.html', 'w')
@@ -698,6 +725,7 @@ def RenderTopPage(games, rankings_by_game_type):
     
     rankings_by_game_type.RenderAllRankingsAsHTML(top_out)
     top_out.write('</body></html>')
+    AdjustedWinPoints(card_win_info)
 
 def PlayerToGameList(games):
     players_to_games = collections.defaultdict(list)
@@ -914,7 +942,8 @@ def main():
         games = json.loads(open('terse_games.json').read())
     else:
         games = json.loads(open('condensed_games.json').read())
-        open('terse_games.json', 'w').write(str(random.sample(games, 1000)))
+        open('terse_games.json', 'w').write(
+            json.dumps(random.sample(games, 1000)))
 
     LabelGamesWithWinPoints(games)
     by_game_type_analysis = RankingByGameTypeAnalysis(games)

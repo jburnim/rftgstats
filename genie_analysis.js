@@ -39,6 +39,40 @@ function GuardFillText(context) {
     return fillText;
 }
 
+
+NOVELTY = 'rgba(0, 192, 255, .6)';
+RARE = 'rgba(120, 60, 00, .6)';
+GENES = 'rgba(75, 255, 0, .6)';
+ALIEN = 'rgba(200, 200, 30, .6)';
+GRAY = 'rgba(75, 75, 75, .6)';
+
+function cardColor(card) {
+    switch (card["Goods"]) {
+    case "Novelty": return NOVELTY;
+    case "Rare": return RARE;
+    case "Genes": return GENES;
+    case "Alien": return ALIEN;
+    }    
+
+    switch (card["Name"]) {
+    case "Free Trade Association":
+    case "Consumer Markets":
+	return NOVELTY; 
+    case "Mining League":
+    case "Mining Conglomerate":
+    case "Mining Robots":
+	return RARE;
+    case "Galactic Genome Project":
+    case "Genetics Lab":
+    case "Pan-galactic League":
+	return GENES; 
+    case "Alien Tech Institute":
+	return ALIEN;
+    }
+    return GRAY;
+}
+
+
 function RenderHomeworldGoalData(canvas_id, data) {
     LoadImages();
     window.onload = function() {
@@ -85,7 +119,7 @@ function RenderHomeworldGoalData(canvas_id, data) {
 	    for (var j = 0; j < data[i].adjusted_rate.length; ++j) {
 		var rate = data[i].adjusted_rate[j];
 		var pos = y_coord(rate);
-		var base = y_coord(data[i].win_rate);
+		var base = y_coord(data[i].win_points);
 		var height = base - pos;
 
 		if (height > 0) {
@@ -114,8 +148,8 @@ function RenderCardWinInfo(data, canvas) {
     var card = data[name];
     maxProbability = Math.max(maxProbability, card["prob_per_card"]);
     minProbability = Math.min(minProbability, card["prob_per_card"]);
-    maxWinRate = Math.max(maxWinRate, card["norm_win_rate"]);
-    minWinRate = Math.min(minWinRate, card["norm_win_rate"]);
+    maxWinRate = Math.max(maxWinRate, card["norm_win_points"]);
+    minWinRate = Math.min(minWinRate, card["norm_win_points"]);
   }
 
   function toCanvasX(prob) {
@@ -171,7 +205,7 @@ function RenderCardWinInfo(data, canvas) {
     var name = namesByCost[i];
     card = data[name];
     x = toCanvasX(card["prob_per_card"]);
-    y = toCanvasY(card["norm_win_rate"]);
+    y = toCanvasY(card["norm_win_points"]);
     if (!location[x]) {
       location[x] = []
     }
@@ -206,69 +240,61 @@ function RenderCardWinInfo(data, canvas) {
     var posX = absX - canvasPos[0];
     var posY = absY - canvasPos[1];
 
-    var cards = [];
+    var cardNames = [];
     for (var x = posX - 4; x <= posX + 4; x++) {
       for (var y = posY - 4; y <= posY + 4; y++) {
         if (location[x] && location[x][y]) {
           for (var i = 0; i < location[x][y].length; i++) {
-            cards.push(location[x][y][i]);
+            cardNames.push(location[x][y][i]);
           }
         }
       }
     }
 
-    if (cards.length == 0) {
+    if (cardNames.length == 0) {
       return;
     }
 
-    createPopup(posX + canvasPos[0] + 5, posY + canvasPos[1] + 5, cards.join(", "));
+    for (var i = 0; i < cardNames.length; ++i) {
+	// variance bars!
+	var card = data[cardNames[i]];
+	var x = toCanvasX(card["prob_per_card"]);
+	var y = toCanvasY(card["norm_win_points"]);
+	var twoYDevs = 2 * card["norm_win_points_ssd"];
+	var yDevMax = toCanvasY(card["norm_win_points"] - twoYDevs);
+	var yDevMin = toCanvasY(card["norm_win_points"] + twoYDevs);
+	context.beginPath();
+	context.strokeStyle = cardColor(cardInfo[cardNames[i]]);
+	context.moveTo(x - 5, yDevMax);
+	context.lineTo(x + 5, yDevMax);
+	context.moveTo(x - 5, yDevMin);
+	context.lineTo(x + 5, yDevMin);
+	context.moveTo(x, yDevMin);
+	context.lineTo(x, yDevMax);
+	context.stroke();
+    }
+    
+    createPopup(posX + canvasPos[0] + 5, posY + canvasPos[1] + 5, 
+		cardNames.join(", "));
     return false;
   }
 }
 
-NOVELTY = 'rgba(0, 192, 255, .6)';
-RARE = 'rgba(120, 60, 00, .6)';
-GENES = 'rgba(75, 255, 0, .6)';
-ALIEN = 'rgba(200, 200, 30, .6)';
-GRAY = 'rgba(75, 75, 75, .6)';
-
 function drawCard(context, x, y, card) {
   context.beginPath();
-  context.fillStyle = GRAY;
   var renderSize = parseInt(card["Cost"]) + 2;
+  cardCol = cardColor(card)
+  context.fillStyle = cardCol;
   if (card["Type"] == "World") {
     context.arc(x, y, renderSize + 2, 0, Math.PI*2, true);
-    switch (card["Goods"]) {
-      case "Novelty": context.fillStyle = NOVELTY; break;
-      case "Rare": context.fillStyle = RARE; break;
-      case "Genes": context.fillStyle = GENES; break;
-      case "Alien": context.fillStyle = ALIEN; break;
-    default: context.fillStyle = GRAY;
-    }
   } else {
     var hor = renderSize + 1;
     var vert = hor * 1.5;
-    context.moveTo(x, y - vert);
+    context.moveTo(x, y - vert);  
     context.lineTo(x + hor, y);
     context.lineTo(x, y + vert);
     context.lineTo(x - hor, y);
     context.lineTo(x, y - vert);
-    switch (card["Name"]) {
-    case "Free Trade Association":
-    case "Consumer Markets":
-	context.fillStyle = NOVELTY; break;
-    case "Mining League":
-    case "Mining Conglomerate":
-    case "Mining Robots":
-	context.fillStyle = RARE; break;
-    case "Galactic Genome Project":
-    case "Genetics Lab":
-    case "Pan-galactic League":
-	context.fillStyle = GENES; break;
-    case "Alien Tech Institute":
-	context.fillStyle = ALIEN; break;
-
-    }
   }
 
   if (card["Military"] == "X"
@@ -291,6 +317,10 @@ function drawCard(context, x, y, card) {
       context.fill();
       context.stroke();
   }
+  
+  context.closePath();
+  context.stroke();
+
 }
 
 function createPopup(x, y, text) {
