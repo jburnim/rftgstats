@@ -135,8 +135,6 @@ class CardInfo:
             return 2 - (card['Cost'] == '6')
         return 1
 
-FREQ, SUM, SUM_SQUARED = range(3)
-
 class RandomVariableObserver:
     def __init__(self):
         self.freq = 0
@@ -491,13 +489,19 @@ def ComputeByCardStats(games, card_yielder, skill_ratings):
     total_tableaus = float(TotalNumTableaus(games))
     for bucket_info in bucketted_stats:
         card = bucket_info.key
+        prob_per_card_name = bucket_info.frequency / total_tableaus
+        prob_per_card_name_var = prob_per_card_name * (1 - prob_per_card_name)
+        prob_per_card_name_ssd = (prob_per_card_name_var / total_tableaus) ** .5
+        freq_in_deck = CardInfo.CardFrequencyInDeck(card)
+        prob_per_card = prob_per_card_name / freq_in_deck
+        prob_per_card_ssd = prob_per_card_name_ssd / freq_in_deck ** .5
         grouped_by_card[card] = {
             'win_points': bucket_info.win_points,
             'norm_win_points': bucket_info.norm_win_points,
             'norm_win_points_ssd': bucket_info.norm_win_points_ssd,
-            'prob_per_card': (bucket_info.frequency / (total_tableaus * 
-                              CardInfo.CardFrequencyInDeck(card)))
-                              }
+            'prob_per_card': prob_per_card,
+            'prob_per_card_ssd': prob_per_card_ssd
+            }
     return grouped_by_card
     
 

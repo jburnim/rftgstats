@@ -46,6 +46,11 @@ GENES = 'rgba(75, 255, 0, .6)';
 ALIEN = 'rgba(200, 200, 30, .6)';
 GRAY = 'rgba(75, 75, 75, .6)';
 
+function rgbaToRgb(rgbaStr) {
+    return rgbaStr.replace('rgba', 'rgb').replace(/(.*),(.*),(.*),(.*)\)/, 
+						  "$1,$2,$3)");
+}
+
 function cardColor(card) {
     switch (card["Goods"]) {
     case "Novelty": return NOVELTY;
@@ -260,18 +265,37 @@ function RenderCardWinInfo(data, canvas) {
 	var card = data[cardNames[i]];
 	var x = toCanvasX(card["prob_per_card"]);
 	var y = toCanvasY(card["norm_win_points"]);
+
+	var twoXDevs = 2 * card["prob_per_card_ssd"];
+	var xDevMin = toCanvasX(card["prob_per_card"] - twoXDevs);
+	var xDevMax = toCanvasX(card["prob_per_card"] + twoXDevs);
+
 	var twoYDevs = 2 * card["norm_win_points_ssd"];
 	var yDevMax = toCanvasY(card["norm_win_points"] - twoYDevs);
 	var yDevMin = toCanvasY(card["norm_win_points"] + twoYDevs);
-	context.beginPath();
-	context.strokeStyle = cardColor(cardInfo[cardNames[i]]);
-	context.moveTo(x - 5, yDevMax);
-	context.lineTo(x + 5, yDevMax);
-	context.moveTo(x - 5, yDevMin);
-	context.lineTo(x + 5, yDevMin);
-	context.moveTo(x, yDevMin);
-	context.lineTo(x, yDevMax);
-	context.stroke();
+
+	// hack.  It seems like the lines are drawn half transparent the first
+	// time, drawing them over and over gets rid of the effect.
+	context.strokeStyle = rgbaToRgb(cardColor(cardInfo[cardNames[i]]));
+	for (var j = 0; j < 5; ++j) {
+	    context.beginPath();
+	    context.moveTo(x - 5, yDevMax);
+	    context.lineTo(x + 5, yDevMax);
+	    context.moveTo(x - 5, yDevMin);
+	    context.lineTo(x + 5, yDevMin);
+	    context.moveTo(x, yDevMin);
+	    context.lineTo(x, yDevMax);
+	    context.stroke();
+
+	    context.beginPath();
+	    context.moveTo(xDevMin, y + 5);
+	    context.lineTo(xDevMin, y - 5);
+	    context.moveTo(xDevMax, y + 5);
+	    context.lineTo(xDevMax, y - 5);
+	    context.moveTo(xDevMin, y);
+	    context.lineTo(xDevMax, y);
+	    context.stroke();
+	}
     }
     
     createPopup(posX + canvasPos[0] + 5, posY + canvasPos[1] + 5, 
@@ -320,7 +344,6 @@ function drawCard(context, x, y, card) {
   
   context.closePath();
   context.stroke();
-
 }
 
 function createPopup(x, y, text) {
