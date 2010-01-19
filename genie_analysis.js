@@ -141,13 +141,14 @@ function RenderHomeworldGoalData(canvas_id, data) {
 }
 
 function RenderCardWinInfo(data, canvas) {
-  var context = canvas.getContext("2d"), height = canvas.height, width = canvas.width,
-      location = [], card, x, y;
+    var context = canvas.getContext("2d"), 
+	height = canvas.height, 
+	width = canvas.width,
+	location = [], card, x, y;
 
   // Compute scales.
   var maxProbability = Number.MIN_VALUE, minProbability = Number.MAX_VALUE;
   var maxWinRate = Number.MIN_VALUE, minWinRate = Number.MAX_VALUE;
-      
 
   for (var name in data) {
     var card = data[name];
@@ -176,6 +177,7 @@ function RenderCardWinInfo(data, canvas) {
 	  return parseInt(cardInfo[nameA]['Cost']) < 
 	      parseInt(cardInfo[nameB]['Cost']);
       });
+  context.clearRect(0, 0, width, height);
 
   var lowestBand = minProbability * minWinRate;
   var highestBand = maxProbability * maxWinRate;
@@ -236,6 +238,7 @@ function RenderCardWinInfo(data, canvas) {
   }
 
   canvas.onclick = function(event) {
+    RenderCardWinInfo(data, canvas);
     var canvasPos = findPos(canvas);
     var absX = (event.clientX + document.body.scrollLeft + 
 		document.documentElement.scrollLeft);
@@ -323,7 +326,8 @@ function drawCard(context, x, y, card) {
 
   if (card["Military"] == "X"
       || (card["Type"] == "Development"
-          && (parseInt(card["Strength"]) > 0 || card["Name"].indexOf("Imperium") > -1))) {
+          && (parseInt(card["Strength"]) > 0 || 
+	      card["Name"].indexOf("Imperium") > -1))) {
     context.strokeStyle = 'rgba(255, 0, 0, 1.0)';
   } else {
     context.strokeStyle = 'rgba(0, 0, 0, 1.0)';

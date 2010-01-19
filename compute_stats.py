@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import collections
+import copy
 import csv
 import math
 import pprint
@@ -114,9 +115,9 @@ because players do not have much of an incentive to game it.</li>
 def Homeworld(player_info):
     # This misclassifes initial doomed world settles that are other homeworlds.
     # I doubt that happens all that often though.
-    if player_info['cards'][0] not in HOMEWORLDS:
-        return 'Doomed World'
-    return player_info['cards'][0]
+    if player_info['cards'][0] in HOMEWORLDS:
+        return player_info['cards'][0]
+    return 'Doomed World'
 
 def InitCardInfoDict():
     card_info = list(csv.DictReader(open('card_attributes.csv', 'r')))
@@ -158,12 +159,12 @@ class RandomVariableObserver:
         return (self.sum_sq - (self.sum ** 2) / self.freq) / (self.freq - 1)
 
     def SampleStdDev(self):
-        return (self.Variance() / self.freq) ** .5
+        return (self.Variance() / (self.freq or 1)) ** .5
         
 def ComputeWinningStatsByHomeworld(games):
     def HomeworldYielder(player_result, game):
         yield Homeworld(player_result)
-    return ComputeWinningStatsByBucket(games, HomeworldYielder)
+    return ComputeStatsByBucketFromGames(games, HomeworldYielder)
 
 def Score(result):
     return result['points'] * 100 + result['goods'] + result['hand']
@@ -171,39 +172,41 @@ def Score(result):
 def WinningScore(game):
     return max(Score(result) for result in game['player_list'])
 
-def LabelGameWithWinPoints(game):
+def DecorateTableaus(game):
     n = float(len(game['player_list']))
     for player_result in game['player_list']:
         player_result['win_points'] = 0.0
-        winners = GameWinners(game)
+        player_result['game'] = game
+    winners = GameWinners(game)
     for player_result in winners:
         player_result['win_points'] = n / len(winners)
+    
 
-def LabelGamesWithWinPoints(games):
+def DecorateTableausInGames(games):
     for game in games:
-        LabelGameWithWinPoints(game)
+        DecorateTableaus(game)
 
-def ComputeWinningStatsByBucket(games, bucketter, rating_system = None):
-    """ Returns a list of BucketInfo sorted by win_points"""
+def ComputeStatsByBucketFromPlayerResults(player_results, 
+                                          bucketter, rating_system):
     wins = collections.defaultdict(RandomVariableObserver)
     norm_wins = collections.defaultdict(RandomVariableObserver)
 
-    for game in FilterOutTies(games):
+    for player_result in player_results:
+        game = player_result['game']
         game_no = game['game_no']
         n = float(len(game['player_list']))
-        for player_result in game['player_list']:
-            player_name = player_result['name']
-            
-            if rating_system:
-                won_prob = rating_system.ProbWonAtGameNo(game_no, player_name)
-            else:
-                won_prob = 1.0 / n
+        player_name = player_result['name']
+        if rating_system:
+            won_prob = rating_system.ProbWonAtGameNo(game_no, player_name)
+        else:
+            won_prob = 1.0 / n
 
-            for key in bucketter(player_result, game):
-                norm_wins[key].AddOutcome(player_result['win_points'] / (
-                        n * won_prob))
-                wins[key].AddOutcome(player_result['win_points'])
+        normalized_outcome = player_result['win_points'] / (n * won_prob)
+        standard_outcome = player_result['win_points']
 
+        for key in bucketter(player_result, game):
+            norm_wins[key].AddOutcome(normalized_outcome)
+            wins[key].AddOutcome(standard_outcome)
 
     bucket_infos = []
     for bucket in norm_wins:
@@ -214,6 +217,17 @@ def ComputeWinningStatsByBucket(games, bucketter, rating_system = None):
 
     bucket_infos.sort(key = lambda x: -x.win_points)
     return bucket_infos
+
+def PlayerResultsFromGames(games):
+    ret = []
+    for game in games:
+        ret.extend(game['player_list'])
+    return ret
+
+def ComputeStatsByBucketFromGames(games, bucketter, rating_system = None):
+    return ComputeStatsByBucketFromPlayerResults(PlayerResultsFromGames(games),
+                                                 bucketter, rating_system)
+                                                 
 
 def GameTied(game):
     return len(GameWinners(game)) > 1
@@ -389,6 +403,9 @@ class SkillRatings:
             self.ranking_percentile[name] = 100.0 * (1.0 - (
                 float(idx) / len(self.sorted_by_skill)))
 
+    def RatingAtGameNo(self, game_no, player_name):
+        return self.ratings_at_game_no[game_no][player_name]
+
     def ProbWonAtGameNo(self, game_no, player_name):
         name_probs = self.prob_won_at_game_no[game_no]
         for name, prob in name_probs:
@@ -402,15 +419,6 @@ class SkillRatings:
 
     def GetHomeworldSkillFlow(self, name):
 	return SortDictByKeys(self.rating_by_homeworld_flow[name])
-
-    def WinProportionAtGameNo(self, game_no, player):
-        ret = 1.0
-        for other_player in self.ratings_at_game_no[game_no]:
-            if other_player == player:
-                continue
-            ret *= EloProbability(self.ratings_at_game_no[player],
-                                  self.ratings_at_game_no[other_player])
-        return ret
 
     def HasPlayer(self, name):
         return name in self.ranking_percentile
@@ -458,9 +466,6 @@ def EloProbability(r1, r2):
     """Probability that r1 beats r2"""
     return 1 / (1 + 10 ** ((r2 - r1) / 400.0))
 
-def TotalNumTableaus(games):
-    return sum(len(g['player_list']) for g in games)
-
 def FilterDiscardables(mapping):
     ret = dict(mapping)
     for card in DISCARDABLE_CARDS:
@@ -481,12 +486,12 @@ class BucketInfo:
         
 # this has the overly non-general assumption that the card is the key, rather
 # than simply a part of the key
-def ComputeByCardStats(games, card_yielder, skill_ratings):
-    bucketted_stats = ComputeWinningStatsByBucket(games, card_yielder,
-                                                  skill_ratings)
+def ComputeByCardStats(player_results, card_yielder, skill_ratings):
+    bucketted_stats = ComputeStatsByBucketFromPlayerResults(
+        player_results, card_yielder, skill_ratings)
     
     grouped_by_card = {}
-    total_tableaus = float(TotalNumTableaus(games))
+    total_tableaus = float(len(player_results))
     for bucket_info in bucketted_stats:
         card = bucket_info.key
         prob_per_card_name = bucket_info.frequency / total_tableaus
@@ -494,7 +499,7 @@ def ComputeByCardStats(games, card_yielder, skill_ratings):
         prob_per_card_name_ssd = (prob_per_card_name_var / total_tableaus) ** .5
         freq_in_deck = CardInfo.CardFrequencyInDeck(card)
         prob_per_card = prob_per_card_name / freq_in_deck
-        prob_per_card_ssd = prob_per_card_name_ssd / freq_in_deck ** .5
+        prob_per_card_ssd = prob_per_card_name_ssd / freq_in_deck
         grouped_by_card[card] = {
             'win_points': bucket_info.win_points,
             'norm_win_points': bucket_info.norm_win_points,
@@ -505,15 +510,14 @@ def ComputeByCardStats(games, card_yielder, skill_ratings):
     return grouped_by_card
     
 
-def ComputeWinningStatsByCardPlayed(games, skill_ratings):
+def ComputeWinningStatsByCardPlayed(player_results, skill_ratings):
     def NonHomeworldCardYielder(player_result, game):
         for idx, card in enumerate(player_result['cards']):
             if not (idx == 0 and card in HOMEWORLDS or
                     card == 'Gambling World'):
                 yield card
     return FilterDiscardables(ComputeByCardStats(
-            games, NonHomeworldCardYielder, skill_ratings))
-            
+            player_results, NonHomeworldCardYielder, skill_ratings))
 
 def FilterOutNonGoals(games):
     return [g for g in games if 'goals' in g]
@@ -524,7 +528,7 @@ class HomeworldGoalAnalysis:
         def HomeworldGoalYielder(player_result, game):
             for goal in game['goals']:
                 yield Homeworld(player_result), goal
-        self.bucketted_by_homeworld_goal = ComputeWinningStatsByBucket(
+        self.bucketted_by_homeworld_goal = ComputeStatsByBucketFromGames(
             games, HomeworldGoalYielder)
         self.keyed_by_homeworld_goal = {}
         for bucket in self.bucketted_by_homeworld_goal:
@@ -577,8 +581,8 @@ def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings, card_info):
         skill_bucket = skill_ratings.PlayerSkillBucket(name, skill_buckets)
         yield (Homeworld(player_result), skill_bucket)
 
-    bucketted_stats = ComputeWinningStatsByBucket(untied_games,
-                                                  HomeworldSkillYielder)
+    bucketted_stats = ComputeStatsByBucketFromGames(untied_games,
+                                                    HomeworldSkillYielder)
     keyed_by_hw_rough_skill = {}
     for bucket in bucketted_stats:
         keyed_by_hw_rough_skill[bucket.key] = (bucket.win_points,
@@ -702,12 +706,14 @@ def RenderTopPage(games, rankings_by_game_type):
     top_out.write(INTRO_BLURB)
     top_out.write(overview.RenderAsHTMLTable())
 
-    gathering_storm_games = [g for g in games if g['expansion'] == 1]
+    gathering_storm_games = FilterOutTies(
+        [g for g in games if g['expansion'] == 1])
     top_out.write(WINNING_RATE_VS_PLAY_RATE_DESCRIPTION)
     top_out.write('<p>From %d Gathering Storm games.</p><br>\n' %
                   len(gathering_storm_games))    
     card_win_info = ComputeWinningStatsByCardPlayed(
-        gathering_storm_games, rankings_by_game_type.AllGamesRatings())
+        PlayerResultsFromGames(gathering_storm_games), 
+        rankings_by_game_type.AllGamesRatings())
     RenderCardWinGraph(top_out, card_win_info)
     homeworld_goal_analysis = HomeworldGoalAnalysis(games)    
     top_out.write("""
@@ -729,7 +735,7 @@ def RenderTopPage(games, rankings_by_game_type):
     
     rankings_by_game_type.RenderAllRankingsAsHTML(top_out)
     top_out.write('</body></html>')
-    AdjustedWinPoints(card_win_info)
+    # AdjustedWinPoints(card_win_info)
 
 def PlayerToGameList(games):
     players_to_games = collections.defaultdict(list)
@@ -816,16 +822,6 @@ class RankingByGameTypeAnalysis:
             top_out.write('</tr>')
         top_out.write('</table>')
 
-
-def SoloGameFromPlayerResult(game, name):
-    for player_result in game['player_list']:
-        if name == player_result['name']:
-            new_game = dict(game)
-            new_game['player_result'] = []
-            new_game['player_result'].append(player_result)
-            return new_game
-    raise ValueError
-
 def KeyGamesByOpponent(target_player, games):
     ret = collections.defaultdict(list)
     for game in games[::-1]:
@@ -834,31 +830,49 @@ def KeyGamesByOpponent(target_player, games):
                 ret[player['name']].append(game)
     return ret
 
-TIE_COLOR = '#444444'
-WIN_COLOR = 'green'
-LOSE_COLOR = 'red'
-
 def AbbrevHomeworld(homeworld_name):
     return ''.join(x[0] for x in homeworld_name.split())
 
 def RenderTableauShort(player_result):
     abbrev_homeworld = AbbrevHomeworld(Homeworld(player_result))
     return '%s-%d' % (abbrev_homeworld, int(player_result['points']))
-                      
 
-def RenderGameWithPerspective(game, source, target):
+
+def GetResultsForNames(game, source, target):
+    source_result, target_result = None, None
     for player_result in game['player_list']:
         if player_result['name'] == source:
             source_result = player_result
         elif player_result['name'] == target:
             target_result = player_result
-    
+    assert source_result != None, 'could not find %s in %s' % (
+        source, str(game))
+    assert target_result != None, 'could not find %s in %s' % (
+        target, str(game))
+    return source_result, target_result
+
+WIN, LOSE, TIE = range(3)
+OUTCOME_TO_COLOR = ['green', 'red', '#444444']
+
+def OutcomeWithPerspective(game, source_result, target_result):
     if source_result['win_points'] == len(game['player_list']):
-        color = WIN_COLOR
+        return WIN
     elif source_result['win_points'] == 0 and target_result['win_points'] > 0:
-        color = LOSE_COLOR
-    else:
-        color = TIE_COLOR
+        return LOSE
+    return TIE
+
+def CountWinLossTie(games, source, target):
+    ret = [0, 0, 0]
+    for game in games:
+        source_result, target_result = GetResultsForNames(game, source, target)
+        outcome = OutcomeWithPerspective(game, source_result, target_result)
+        ret[outcome] += 1
+    return ret
+
+def RenderGameWithPerspective(game, source, target):
+    source_result, target_result = GetResultsForNames(game, source, target)
+    color = OUTCOME_TO_COLOR[OutcomeWithPerspective(game, source_result, 
+                                                    target_result)]
 
     return ('<a href="http://genie.game-host.org/game.htm?gid=%d">' +
             '<font color="%s">' + 
@@ -866,6 +880,17 @@ def RenderGameWithPerspective(game, source, target):
                                    RenderTableauShort(source_result),
                                    RenderTableauShort(target_result))
     
+def ComputeSinglePlayerWinningStats(player, player_games, rating_system):
+    gathering_storm_tableaus = []
+    for game in FilterOutTies(player_games):
+        if game['expansion'] != 1:
+            continue
+        for player_result in game['player_list']:
+            if player_result['name'] == player:
+                gathering_storm_tableaus.append(player_result)
+
+    return ComputeWinningStatsByCardPlayed(gathering_storm_tableaus, 
+                                           rating_system)
 
 def RenderPlayerPage(player, player_games, by_game_type_analysis):
     overview = OverviewStats(player_games)
@@ -873,18 +898,15 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis):
     player_out.write('<html><head><title> %s %s'
                      '</title>%s</head><body>\n' % (TITLE, player, JS_INCLUDE))
 
-    player_out.write('<a href="#overview">Overview</a>\n'
-                     '<a href="#homeworld_flow">Homeworld Rating Flow</a>'
-                     '<a href="#player_flow">Player Rating Flow</a>\n'
+    player_out.write('<a href="#overview">Overview</a> \n'
+                     '<a href="#homeworld_flow">Homeworld Rating Flow</a> \n'
+                     '<a href="#player_flow">Player Rating Flow</a> \n'
                      '<br>\n')
     player_out.write(overview.RenderAsHTMLTable())
 
-    gathering_storm_solo_games = [
-        SoloGameFromPlayerResult(g, player) for g in player_games 
-        if g['expansion'] == 1]
+    card_win_info = ComputeSinglePlayerWinningStats(
+        player, player_games, by_game_type_analysis.AllGamesRatings())
         
-    card_win_info = ComputeWinningStatsByCardPlayed(
-        gathering_storm_solo_games, by_game_type_analysis.AllGamesRatings())
     RenderCardWinGraph(player_out, card_win_info)
 
     player_out.write('<a name="homeworld_flow"> '
@@ -900,15 +922,22 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis):
 
     player_out.write('<a name="player_flow"> '
                      '<table border=1><tr><td>Opponent</td>'
-                     '<td>Net rating flow</td></tr>\n')
+                     '<td>Net rating flow</td><td>Record</td></tr>\n')
     for opponent, skill_flow in all_games_ratings.GetRatingFlow(player):
-        player_out.write('<tr><td>%s</td><td>%.1f</td>' % (
-                PlayerLink(opponent), skill_flow))
+        record = CountWinLossTie(paired_games[opponent], player, opponent)
+        player_out.write('<tr><td>%s</td><td>%.1f</td>'
+                         '<td><font color="%s">%d</font>-'
+                         '<font color="%s">%d</font>-'
+                         '<font color="%s">%d</font></td>' % (
+                PlayerLink(opponent), skill_flow, 
+                OUTCOME_TO_COLOR[WIN], record[WIN], 
+                OUTCOME_TO_COLOR[LOSE], record[LOSE],
+                OUTCOME_TO_COLOR[TIE], record[TIE]))
         for game in paired_games[opponent]:
             player_out.write('<td>')
             player_out.write(RenderGameWithPerspective(game, player, opponent))
             player_out.write('</td>')
-        player_out.write('</tr>')
+        player_out.write('</tr>\n')
             
 
     player_out.write('</table>')
@@ -949,7 +978,7 @@ def main():
         open('terse_games.json', 'w').write(
             json.dumps(random.sample(games, 1000)))
 
-    LabelGamesWithWinPoints(games)
+    DecorateTableausInGames(games)
     by_game_type_analysis = RankingByGameTypeAnalysis(games)
     if not os.access('output', os.O_RDONLY):
         os.mkdir('output')
