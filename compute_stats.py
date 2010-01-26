@@ -1054,8 +1054,8 @@ def main():
     by_game_type_analysis = RankingByGameTypeAnalysis(games)
     if not os.access('output', os.O_RDONLY):
         os.mkdir('output')
-    # RenderTopPage(games, by_game_type_analysis)
-    # RenderGoalVsNonGoalPage(games, by_game_type_analysis)
+    RenderTopPage(games, by_game_type_analysis)
+    RenderGoalVsNonGoalPage(games, by_game_type_analysis)
     RenderGameSizePage(games, by_game_type_analysis)
 
     return
