@@ -140,171 +140,259 @@ function RenderHomeworldGoalData(canvas_id, data) {
     }
 }
 
-function RenderCardWinInfo(data, canvas) {
+function WindowBound(width, height) {
+    var bound = {}
+    bound.width = width;
+    bound.height = height;
+    bound.maxProbability = Number.MIN_VALUE;
+    bound.minProbability = Number.MAX_VALUE;
+    bound.maxWinRate = Number.MIN_VALUE;
+    bound.minWinRate = Number.MAX_VALUE;
+
+    bound.ExtendToFit = function(cardWinData) {
+	for (var name in cardWinData) {
+	    var card = cardWinData[name];
+	    bound.maxProbability = Math.max(bound.maxProbability, 
+					   card["prob_per_card"]);
+	    bound.minProbability = Math.min(bound.minProbability, 
+					   card["prob_per_card"]);
+	    bound.maxWinRate = Math.max(bound.maxWinRate, 
+					card["norm_win_points"]);
+	    bound.minWinRate = Math.min(bound.minWinRate, 
+					card["norm_win_points"]);
+	};
+    };
+
+    bound.ToCanvasX = function(prob) {
+	return parseInt(prob / (bound.maxProbability - bound.minProbability) * 
+			bound.width * 0.8);
+    };
+
+    bound.ToCanvasY = function(rate) {
+	return parseInt((0.1 * bound.height) + (bound.maxWinRate - rate) /
+			(bound.maxWinRate - bound.minWinRate) * 0.8 * height);
+    }
+    return bound;
+};
+
+function RenderCardWinInfo(data, canvas, wind) {
     var context = canvas.getContext("2d"), 
 	height = canvas.height, 
 	width = canvas.width,
 	location = [], card, x, y;
 
-  // Compute scales.
-  var maxProbability = Number.MIN_VALUE, minProbability = Number.MAX_VALUE;
-  var maxWinRate = Number.MIN_VALUE, minWinRate = Number.MAX_VALUE;
-
-  for (var name in data) {
-    var card = data[name];
-    maxProbability = Math.max(maxProbability, card["prob_per_card"]);
-    minProbability = Math.min(minProbability, card["prob_per_card"]);
-    maxWinRate = Math.max(maxWinRate, card["norm_win_points"]);
-    minWinRate = Math.min(minWinRate, card["norm_win_points"]);
-  }
-
-  function toCanvasX(prob) {
-      return parseInt(prob /
-                      (maxProbability - minProbability) 
-                      * width * 0.8);
-  }
-
-  function toCanvasY(rate) {
-      return parseInt((0.1 * height) + (maxWinRate - rate) /
-		      (maxWinRate - minWinRate) * 0.8 * height);
-  }
-
-  var namesByCost = [];
-  for (name in data) {
-      namesByCost.push(name);
-  }
-  namesByCost.sort(function(nameA, nameB) { 
-	  return parseInt(cardInfo[nameA]['Cost']) < 
-	      parseInt(cardInfo[nameB]['Cost']);
-      });
-  context.clearRect(0, 0, width, height);
-
-  var lowestBand = minProbability * minWinRate;
-  var highestBand = maxProbability * maxWinRate;
-  var NUM_BANDS = 10;
-  var DETAIL = 200;
-
-  var fillText = GuardFillText(context);
-  context.strokeStyle = 'rgba(120, 120, 120, .5)';
-  context.fillStyle = 'rgba(120, 120, 120, .5)';
-  context.textAlign = 'center';
-  for (var i = 0; i < NUM_BANDS; ++i) {
-      context.beginPath();
-
-      var curBand = lowestBand + i * (highestBand - lowestBand) / NUM_BANDS;
-      context.moveTo(toCanvasX(minProbability), 
-		     toCanvasY(curBand / minProbability));
-      for (var j = 0; j < DETAIL; ++j) {
-	  var curProb = minProbability + 
-	      j * (maxProbability - minProbability) / DETAIL;
-	  var curWin = curBand / curProb;
-	  context.lineTo(toCanvasX(curProb), toCanvasY(curWin));
-      }
-      context.stroke();
-      var targetHeight = maxWinRate * .95;
-      fillText(("" + curBand).substr(0, 4), 
-	       toCanvasX(curBand / targetHeight), 
-	       toCanvasY(targetHeight));
-  }
-
-  // Draw dots.
-  for (var i = 0; i < namesByCost.length; ++i) {
-    var name = namesByCost[i];
-    card = data[name];
-    x = toCanvasX(card["prob_per_card"]);
-    y = toCanvasY(card["norm_win_points"]);
-    if (!location[x]) {
-      location[x] = []
+    var window = wind;
+    if (!window) {
+	window = WindowBound(width, height);
     }
-    if (!location[x][y]) {
-      location[x][y] = []
-    }
-    location[x][y].push(name);
+    window.ExtendToFit(data);
 
-    drawCard(context, x, y, cardInfo[name]);
-  }
-  context.fillStyle = 'black';
-  context.textAlign = 'start';
-  for (var i = 0; i <= 10; ++i) {
-      var cur = i * maxProbability / 10;
-      var label = ("" + cur).substring(0, 4);
-      fillText(label, toCanvasX(parseFloat(label)), height - 8);
-  }
+    context.clearRect(0, 0, width, height);
 
-  for (var i = 0; i <= 10; ++i) {
-      var cur = i * (maxWinRate - minWinRate) / 10 + minWinRate;
-      var label = ("" + cur).substring(0, 4);
-      fillText(label, 10, toCanvasY(parseFloat(label)));
-  }
+    var lowestBand = window.minProbability * window.minWinRate;
+    var highestBand = window.maxProbability * window.maxWinRate;
+    var NUM_BANDS = 10;
+    var DETAIL = 200;
 
-  canvas.onclick = function(event) {
-    RenderCardWinInfo(data, canvas);
-    var canvasPos = findPos(canvas);
-    var absX = (event.clientX + document.body.scrollLeft + 
-		document.documentElement.scrollLeft);
-    var absY = (event.clientY + document.body.scrollTop + 
-		document.documentElement.scrollTop);
+    var fillText = GuardFillText(context);
+    context.strokeStyle = 'rgba(120, 120, 120, .5)';
+    context.fillStyle = 'rgba(120, 120, 120, .5)';
+    context.textAlign = 'center';
+    for (var i = 0; i < NUM_BANDS; ++i) {
+	context.beginPath();
 
-    var posX = absX - canvasPos[0];
-    var posY = absY - canvasPos[1];
-
-    var cardNames = [];
-    for (var x = posX - 4; x <= posX + 4; x++) {
-      for (var y = posY - 4; y <= posY + 4; y++) {
-        if (location[x] && location[x][y]) {
-          for (var i = 0; i < location[x][y].length; i++) {
-            cardNames.push(location[x][y][i]);
-          }
-        }
-      }
-    }
-
-    if (cardNames.length == 0) {
-      return;
-    }
-
-    for (var i = 0; i < cardNames.length; ++i) {
-	// variance bars!
-	var card = data[cardNames[i]];
-	var x = toCanvasX(card["prob_per_card"]);
-	var y = toCanvasY(card["norm_win_points"]);
-
-	var twoXDevs = 2 * card["prob_per_card_ssd"];
-	var xDevMin = toCanvasX(card["prob_per_card"] - twoXDevs);
-	var xDevMax = toCanvasX(card["prob_per_card"] + twoXDevs);
-
-	var twoYDevs = 2 * card["norm_win_points_ssd"];
-	var yDevMax = toCanvasY(card["norm_win_points"] - twoYDevs);
-	var yDevMin = toCanvasY(card["norm_win_points"] + twoYDevs);
-
-	// hack.  It seems like the lines are drawn half transparent the first
-	// time, drawing them over and over gets rid of the effect.
-	context.strokeStyle = rgbaToRgb(cardColor(cardInfo[cardNames[i]]));
-	for (var j = 0; j < 5; ++j) {
-	    context.beginPath();
-	    context.moveTo(x - 5, yDevMax);
-	    context.lineTo(x + 5, yDevMax);
-	    context.moveTo(x - 5, yDevMin);
-	    context.lineTo(x + 5, yDevMin);
-	    context.moveTo(x, yDevMin);
-	    context.lineTo(x, yDevMax);
-	    context.stroke();
-
-	    context.beginPath();
-	    context.moveTo(xDevMin, y + 5);
-	    context.lineTo(xDevMin, y - 5);
-	    context.moveTo(xDevMax, y + 5);
-	    context.lineTo(xDevMax, y - 5);
-	    context.moveTo(xDevMin, y);
-	    context.lineTo(xDevMax, y);
-	    context.stroke();
+	var curBand = lowestBand + i * (highestBand - lowestBand) / NUM_BANDS;
+	context.moveTo(window.ToCanvasX(window.minProbability), 
+		       window.ToCanvasY(curBand / window.minProbability));
+		       
+	for (var j = 0; j < DETAIL; ++j) {
+	    var curProb = window.minProbability + 
+		j * (window.maxProbability - window.minProbability) / DETAIL;
+	    var curWin = curBand / curProb;
+	    context.lineTo(window.ToCanvasX(curProb), 
+			   window.ToCanvasY(curWin));
 	}
+	context.stroke();
+	var targetHeight = window.maxWinRate * .95;
+	fillText(("" + curBand).substr(0, 4), 
+		 window.ToCanvasX(curBand / targetHeight), 
+		 window.ToCanvasY(targetHeight));
     }
+
+    for (var i = 0; i <= 10; ++i) {
+	var cur = i * window.maxProbability / 10;
+	var label = ("" + cur).substring(0, 4);
+	fillText(label, window.ToCanvasX(parseFloat(label)), height - 8);
+    }
+
+    for (var i = 0; i <= 10; ++i) {
+	var cur = i * (window.maxWinRate - window.minWinRate) / 10 + 
+	    window.minWinRate;
+	var label = ("" + cur).substring(0, 4);
+	fillText(label, 10, window.ToCanvasY(parseFloat(label)));
+    }
+
+    var namesByCost = [];
+    for (name in data) {
+	namesByCost.push(name);
+    }
+    namesByCost.sort(function(nameA, nameB) { 
+	    return parseInt(cardInfo[nameA]['Cost']) < 
+		parseInt(cardInfo[nameB]['Cost']);
+	});
+
+    // Draw dots.
+    for (var i = 0; i < namesByCost.length; ++i) {
+	var name = namesByCost[i];
+	card = data[name];
+	x = window.ToCanvasX(card["prob_per_card"]);
+	y = window.ToCanvasY(card["norm_win_points"]);
+	if (!location[x]) {
+	    location[x] = [];
+	}
+	if (!location[x][y]) {
+	    location[x][y] = [];
+	}
+	location[x][y].push(name);
+	drawCard(context, x, y, cardInfo[name]);
+    }
+    context.fillStyle = 'black';
+    context.textAlign = 'start';
+
+    canvas.onclick = function(event) {
+	RenderCardWinInfo(data, canvas, window);
+	var canvasPos = findPos(canvas);
+	var absX = (event.clientX + document.body.scrollLeft + 
+		    document.documentElement.scrollLeft);
+	var absY = (event.clientY + document.body.scrollTop + 
+		    document.documentElement.scrollTop);
+
+	var posX = absX - canvasPos[0];
+	var posY = absY - canvasPos[1];
+
+	var cardNames = [];
+	for (var x = posX - 4; x <= posX + 4; x++) {
+	    for (var y = posY - 4; y <= posY + 4; y++) {
+		if (location[x] && location[x][y]) {
+		    for (var i = 0; i < location[x][y].length; i++) {
+			cardNames.push(location[x][y][i]);
+		    }
+		}
+	    }
+	}
+
+	console.log(cardNames);
+	if (cardNames.length == 0) {
+	    return;
+	}
+
+	for (var i = 0; i < cardNames.length; ++i) {
+	    // variance bars!
+	    var card = data[cardNames[i]];
+	    var x = window.ToCanvasX(card["prob_per_card"]);
+	    var y = window.ToCanvasY(card["norm_win_points"]);
+	    
+	    var twoXDevs = 2 * card["prob_per_card_ssd"];
+	    var xDevMin = window.ToCanvasX(card["prob_per_card"] - twoXDevs);
+	    var xDevMax = window.ToCanvasX(card["prob_per_card"] + twoXDevs);
+
+	    var twoYDevs = 2 * card["norm_win_points_ssd"];
+	    var yDevMax = window.ToCanvasY(card["norm_win_points"] - twoYDevs);
+	    var yDevMin = window.ToCanvasY(card["norm_win_points"] + twoYDevs);
+
+	    // hack.  It seems like the lines are drawn half transparent the 
+	    // first time, drawing them over and over gets rid of the effect.
+	    context.strokeStyle = rgbaToRgb(cardColor(cardInfo[cardNames[i]]));
+	    for (var j = 0; j < 5; ++j) {
+		context.beginPath();
+		context.moveTo(x - 5, yDevMax);
+		context.lineTo(x + 5, yDevMax);
+		context.moveTo(x - 5, yDevMin);
+		context.lineTo(x + 5, yDevMin);
+		context.moveTo(x, yDevMin);
+		context.lineTo(x, yDevMax);
+		context.stroke();
+
+		context.beginPath();
+		context.moveTo(xDevMin, y + 5);
+		context.lineTo(xDevMin, y - 5);
+		context.moveTo(xDevMax, y + 5);
+		context.lineTo(xDevMax, y - 5);
+		context.moveTo(xDevMin, y);
+		context.lineTo(xDevMax, y);
+		context.stroke();
+	    }
+	}
     
-    createPopup(posX + canvasPos[0] + 5, posY + canvasPos[1] + 5, 
-		cardNames.join(", "));
-    return false;
-  }
+	createPopup(posX + canvasPos[0] + 5, posY + canvasPos[1] + 5, 
+		    cardNames.join(", "));
+	return false;
+    }
+}
+
+
+function VectorMul(v, mul) {
+    var ret = {};
+    for (var key in v) {
+	ret[key] = v[key] * mul;
+    }
+    return ret;
+}
+
+function VectorAdd(a, b) {
+    var ret = {};
+    if (a.length != b.length) {
+	throw "mismatched lengths " + a.length + " " + b.length;
+    }
+    for (var key in a) {
+	if (!(key in b)) {
+	    throw key + " missing";
+	}
+	ret[key] = a[key] + b[key];
+    }
+    return ret;
+}
+
+function RenderCardWinAnimationInfo(cardWinAnimationInfo, canvas) {
+    // cardWinAnimationInfo is sufficiently complicated that it probably
+    // deserves to be a class, of at least an array of WinInfoFrame classes.
+    var duration = 5000;
+    var start = new Date().getTime();
+    var window = WindowBound(canvas.width, canvas.height);
+    for (var i = 0; i < cardWinAnimationInfo.length; ++i) {
+	window.ExtendToFit(cardWinAnimationInfo[i]);
+    }
+    var doneNext = false;
+    setInterval(function() {
+	    var now = new Date().getTime();
+	    var elapsed = now - start;
+	    //console.log(elapsed);
+	    var loFrame = Math.floor(elapsed / duration);
+	    var hiFrame = loFrame + 1;
+	    var interp = elapsed / duration - loFrame;
+	    if (hiFrame >= cardWinAnimationInfo.length) {
+		if (!doneNext) {
+		    loFrame = hiFrame = cardWinAnimationInfo.length - 1;
+		    doneNext = true;
+		}
+		else {
+		    return;
+		}
+	    }
+	    var interpData = {};
+	    for (var cardName in cardWinAnimationInfo[loFrame]) {
+		if (!(cardName in cardWinAnimationInfo[hiFrame])) {
+		    throw cardName + " not in hiFrame, confused!";
+		}
+		loFrameCardData = cardWinAnimationInfo[loFrame][cardName];
+		hiFrameCardData = cardWinAnimationInfo[hiFrame][cardName];
+		var sInterp = interp * interp * (3 - 2 * interp);
+		interpData[cardName] = 
+		    VectorAdd(VectorMul(loFrameCardData, 1 - sInterp),
+			      VectorMul(hiFrameCardData, sInterp));
+	    }
+	    RenderCardWinInfo(interpData, canvas, window);
+	}, 50);
 }
 
 function drawCard(context, x, y, card) {

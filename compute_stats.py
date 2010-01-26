@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import collections
-import copy
 import csv
 import math
 import pprint
@@ -36,8 +35,10 @@ GOALS = [
 DISCARDABLE_CARDS = ['Doomed World', 'Colony Ship', 'New Military Tactics']
 
 TITLE = 'RFTGStats.com: Race for the Galaxy Statistics'
-JS_INCLUDE = ('<script type="text/javascript" src="genie_analysis.js"></script>'
-              '<script type="text/javascript" src="card_attrs.js"></script>')
+JS_INCLUDE = (
+    '<script type="text/javascript" src="card_attrs.js"></script>'
+    '<script type="text/javascript" src="genie_analysis.js"></script>'
+    )
 CSS = '<link rel="stylesheet" type="text/css" href="style.css" />'
 
 INTRO_BLURB = """<h2>Introduction</h2>
@@ -519,8 +520,31 @@ def ComputeWinningStatsByCardPlayed(player_results, skill_ratings):
     return FilterDiscardables(ComputeByCardStats(
             player_results, NonHomeworldCardYielder, skill_ratings))
 
+def GoalGame(g):
+    return 'goals' in g
+
+def GoalInfluenceOnCardStats(player_results, skill_ratings):
+    with_goals, without_goals = [], []
+    for player_result in player_results:
+        if GoalGame(player_result['game']):
+            with_goals.append(player_result)
+        else:
+            without_goals.append(player_result)
+    return [
+        ComputeWinningStatsByCardPlayed(without_goals, skill_ratings),
+        ComputeWinningStatsByCardPlayed(with_goals, skill_ratings)
+        ]
+
+def GameSizeInfluenceOnCardStats(player_results, skill_ratings):
+    games_by_size = collections.defaultdict(list)
+    for player_result in player_results:
+        game_size = len(player_result['game']['player_list'])
+        games_by_size[game_size].append(player_result)
+    return [ComputeWinningStatsByCardPlayed(games_by_size[size], skill_ratings)
+            for size in sorted(games_by_size.keys())]
+
 def FilterOutNonGoals(games):
-    return [g for g in games if 'goals' in g]
+    return [g for g in games if GoalGame(g)]
 
 class HomeworldGoalAnalysis:
     def __init__(self, games):
@@ -669,6 +693,27 @@ Probability instance of card appears on tableau</center></td>
 </script>
 </p>
 """ % json.dumps(card_win_info, indent=2))
+
+def RenderCardAnimationGraph(out_file, animated_win_info):
+    out_file.write("""
+<p>
+<table><tr><td>Winning Rate</td>
+   <td><canvas id="cardWinAnimationCanvas" height="600" width="800"></canvas>
+</td>
+</tr>
+<tr>
+<td></td><td><center>
+Probability instance of card appears on tableau</center></td>
+</tr>
+</table>
+<script type="text/javascript">
+  var cardWinAnimationInfo = %s;
+  RenderCardWinAnimationInfo(cardWinAnimationInfo,
+document.getElementById("cardWinAnimationCanvas"));
+</script>
+</p>
+""" % json.dumps(animated_win_info, indent=2))
+
     
 
 def AdjustedWinPoints(cardWinInfo):
@@ -693,7 +738,35 @@ def AdjustedWinPoints(cardWinInfo):
     for per_card_info in observed_norm_win_points:
         print per_card_info[0].ljust(25), ('%.3f' % per_card_info[1]['norm_win_points_per_game']).ljust(20), per_card_info[1]['norm_win_points']
     
+
+def NonTiedGatheringStormGames(games):
+    return FilterOutTies(
+        [g for g in games if g['expansion'] == 1])
     
+def RenderGoalVsNonGoalPage(games, rankings_by_game_type):
+    overview = OverviewStats(games)
+    out = open('output/goals_vs_nongoals.html', 'w')
+    out.write('<html><head><title>' + TITLE + ' goal vs non-goal influence' +
+              '</title>' + JS_INCLUDE + CSS + '</head>')
+    gs_games = NonTiedGatheringStormGames(games)
+    goal_influence_data = GoalInfluenceOnCardStats(
+        PlayerResultsFromGames(gs_games), 
+        rankings_by_game_type.AllGamesRatings())
+    RenderCardAnimationGraph(out, goal_influence_data)
+    out.write('</html>')
+
+def RenderGameSizePage(games, rankings_by_game_type):
+    overview = OverviewStats(games)
+    out = open('output/game_size.html', 'w')
+    out.write('<html><head><title>' + TITLE + ' Game size influence on cards' +
+              '</title>' + JS_INCLUDE + CSS + '</head>')
+    gs_games = NonTiedGatheringStormGames(games)
+    game_size_data = GameSizeInfluenceOnCardStats(
+        PlayerResultsFromGames(gs_games), 
+        rankings_by_game_type.AllGamesRatings())
+    RenderCardAnimationGraph(out, game_size_data)
+    out.write('</html>')
+        
 
 def RenderTopPage(games, rankings_by_game_type):
     overview = OverviewStats(games)
@@ -706,8 +779,7 @@ def RenderTopPage(games, rankings_by_game_type):
     top_out.write(INTRO_BLURB)
     top_out.write(overview.RenderAsHTMLTable())
 
-    gathering_storm_games = FilterOutTies(
-        [g for g in games if g['expansion'] == 1])
+    gathering_storm_games = NonTiedGatheringStormGames(games)
     top_out.write(WINNING_RATE_VS_PLAY_RATE_DESCRIPTION)
     top_out.write('<p>From %d Gathering Storm games.</p><br>\n' %
                   len(gathering_storm_games))    
@@ -982,8 +1054,11 @@ def main():
     by_game_type_analysis = RankingByGameTypeAnalysis(games)
     if not os.access('output', os.O_RDONLY):
         os.mkdir('output')
-    RenderTopPage(games, by_game_type_analysis)
+    # RenderTopPage(games, by_game_type_analysis)
+    # RenderGoalVsNonGoalPage(games, by_game_type_analysis)
+    RenderGameSizePage(games, by_game_type_analysis)
 
+    return
     for player, player_games in PlayerToGameList(games).iteritems():
         RenderPlayerPage(player, player_games, by_game_type_analysis)
     CopySupportFilesToOutput(debugging_on)
