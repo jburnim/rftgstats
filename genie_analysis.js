@@ -281,7 +281,6 @@ function RenderCardWinInfo(data, canvas, wind) {
 	    }
 	}
 
-	console.log(cardNames);
 	if (cardNames.length == 0) {
 	    return;
 	}
