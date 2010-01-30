@@ -1058,7 +1058,6 @@ def main():
     RenderGoalVsNonGoalPage(games, by_game_type_analysis)
     RenderGameSizePage(games, by_game_type_analysis)
 
-    return
     for player, player_games in PlayerToGameList(games).iteritems():
         RenderPlayerPage(player, player_games, by_game_type_analysis)
     CopySupportFilesToOutput(debugging_on)
