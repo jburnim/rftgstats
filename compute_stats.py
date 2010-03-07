@@ -113,13 +113,119 @@ because players do not have much of an incentive to game it.</li>
 </ul>
 """
 
-def Homeworld(player_info):
-    # This misclassifes initial doomed world settles that are other homeworlds.
-    # I doubt that happens all that often though.
-    if player_info['cards'][0] in HOMEWORLDS:
-        return player_info['cards'][0]
-    return 'Doomed World'
+def GetAndRemove(dict, key):
+    ret = dict[key]
+    del dict[key]
+    return ret
 
+class Game:
+    def __init__(self, game_dict):
+        n = float(len(game_dict['player_list']))
+
+        self.player_list = map(PlayerResult, game_dict['player_list'])
+        del game_dict['player_list']
+
+        for player_result in self.PlayerList():
+            player_result.SetWinPoints(0.0)
+            player_result.SetGame(self)
+        winners = self.GameWinners()
+        for player_result in winners:
+            player_result.SetWinPoints(n / len(winners))
+
+        self.goals = []
+        if 'goals' in game_dict:
+            self.goals = GetAndRemove(game_dict, 'goals')
+
+        self.game_no = GetAndRemove(game_dict, 'game_no')
+        self.expansion = GetAndRemove(game_dict, 'expansion')
+        self.advanced = GetAndRemove(game_dict, 'advanced')
+        
+        assert len(game_dict) == 0
+
+    def WinningScore(self):
+        return max(result.Score() for result in self.PlayerList())
+
+    def GameWinners(self):
+        max_score = self.WinningScore()
+        return [p for p in self.PlayerList() if p.Score() == max_score]
+
+    def PlayerList(self):
+        return self.player_list
+
+    def GameNo(self):
+        return self.game_no
+
+    def Goals(self):
+        return self.goals
+
+    def GoalGame(self):
+        return len(self.goals) > 0
+
+    def Expansion(self):
+        return self.expansion
+
+    def Advanced(self):
+        return self.advanced
+
+    def PlayerResultForName(self, player_name):
+        for player in self.PlayerList():
+            if player.Name() == player_name:
+                return player
+        raise ValueError
+
+
+class PlayerResult:
+    def __init__(self, player_info_dict):
+        self.cards = GetAndRemove(player_info_dict, 'cards')
+
+        self.homeworld = ''
+        # This misclassifes initial doomed world settles that are
+        # other homeworlds.  I doubt that happens all that often
+        # though.
+        if self.cards[0] in HOMEWORLDS:
+            self.homeworld = self.cards[0]
+        else:
+            self.homeworld = 'Doomed World'
+
+        self.name = GetAndRemove(player_info_dict, 'name')
+        self.points = GetAndRemove(player_info_dict, 'points')
+        self.hand = GetAndRemove(player_info_dict, 'hand')
+        self.goods = GetAndRemove(player_info_dict, 'goods')
+
+        self.goals = []
+        if 'goals' in player_info_dict:
+            self.goals = GetAndRemove(player_info_dict, 'goals')
+        self.chips = GetAndRemove(player_info_dict, 'chips')
+
+        assert len(player_info_dict) == 0, player_info_dict.keys()
+
+    def Homeworld(self):
+        return self.homeworld
+
+    def SetGame(self, game):
+        self.game = game
+
+    def Game(self):
+        return self.game
+
+    def SetWinPoints(self, win_points):
+        self.win_points = win_points
+
+    def WinPoints(self):
+        return self.win_points
+
+    def Points(self):
+        return self.points
+
+    def Score(self):
+        return self.points * 100 + self.goods + self.hand
+
+    def Cards(self):
+        return self.cards
+
+    def Name(self):
+        return self.name
+        
 def InitCardInfoDict():
     card_info = list(csv.DictReader(open('card_attributes.csv', 'r')))
     card_info_dict = dict((x["Name"], x) for x in card_info)
@@ -164,28 +270,8 @@ class RandomVariableObserver:
         
 def ComputeWinningStatsByHomeworld(games):
     def HomeworldYielder(player_result, game):
-        yield Homeworld(player_result)
+        yield player_result.Homeworld()
     return ComputeStatsByBucketFromGames(games, HomeworldYielder)
-
-def Score(result):
-    return result['points'] * 100 + result['goods'] + result['hand']
-
-def WinningScore(game):
-    return max(Score(result) for result in game['player_list'])
-
-def DecorateTableaus(game):
-    n = float(len(game['player_list']))
-    for player_result in game['player_list']:
-        player_result['win_points'] = 0.0
-        player_result['game'] = game
-    winners = GameWinners(game)
-    for player_result in winners:
-        player_result['win_points'] = n / len(winners)
-    
-
-def DecorateTableausInGames(games):
-    for game in games:
-        DecorateTableaus(game)
 
 def ComputeStatsByBucketFromPlayerResults(player_results, 
                                           bucketter, rating_system):
@@ -193,17 +279,17 @@ def ComputeStatsByBucketFromPlayerResults(player_results,
     norm_wins = collections.defaultdict(RandomVariableObserver)
 
     for player_result in player_results:
-        game = player_result['game']
-        game_no = game['game_no']
-        n = float(len(game['player_list']))
-        player_name = player_result['name']
+        game = player_result.Game()
+        game_no = game.GameNo()
+        n = float(len(game.PlayerList()))
+        player_name = player_result.Name()
         if rating_system:
             won_prob = rating_system.ProbWonAtGameNo(game_no, player_name)
         else:
             won_prob = 1.0 / n
 
-        normalized_outcome = player_result['win_points'] / (n * won_prob)
-        standard_outcome = player_result['win_points']
+        normalized_outcome = player_result.WinPoints() / (n * won_prob)
+        standard_outcome = player_result.WinPoints()
 
         for key in bucketter(player_result, game):
             norm_wins[key].AddOutcome(normalized_outcome)
@@ -222,28 +308,18 @@ def ComputeStatsByBucketFromPlayerResults(player_results,
 def PlayerResultsFromGames(games):
     ret = []
     for game in games:
-        ret.extend(game['player_list'])
+        ret.extend(game.PlayerList())
     return ret
 
 def ComputeStatsByBucketFromGames(games, bucketter, rating_system = None):
     return ComputeStatsByBucketFromPlayerResults(PlayerResultsFromGames(games),
                                                  bucketter, rating_system)
                                                  
-
 def GameTied(game):
-    return len(GameWinners(game)) > 1
-
-def GameWinners(game):
-    max_score = WinningScore(game)
-    return [p for p in game['player_list'] if Score(p) == max_score]
+    return len(game.GameWinners()) > 1
 
 def FilterOutTies(games):
     return [g for g in games if not GameTied(g)]
-
-def GetPlayerResultForName(game, player_name):
-    for player in game['player_list']:
-	if player['name'] == player_name:
-	    return player
 
 class PlayerSkillInfo:
     def __init__(self, rating, wins, exp_wins, games_played):
@@ -255,7 +331,6 @@ class PlayerSkillInfo:
 
     def __repr__(self):
         return str(self.rating)
-
 
 def SortDictByKeys(d):
     return sorted(d.items(), key = lambda x: -x[1])
@@ -351,23 +426,23 @@ class SkillRatings:
         self.prob_won_at_game_no = collections.defaultdict(dict)
 
         for game in FilterOutTies(games):
-            winner = GameWinners(game)[0]
-            win_name = winner['name']
+            winner = game.GameWinners()[0]
+            win_name = winner.Name()
             losers = []
-            game_no = game['game_no']
-            for player in game['player_list']:
-                player_name = player['name']
+            game_no = game.GameNo()
+            for player in game.PlayerList():
+                player_name = player.Name()
                 rating = self.GetSkillInfo(player_name).rating
                 self.ratings_at_game_no[game_no][player_name] = rating
                 if player_name == win_name:
                     continue
-                loser_name = player['name']
+                loser_name = player.Name()
                 win_prob = self.skill_model.Predict(win_name, loser_name)
                 self.model_log_loss += math.log(win_prob) / math.log(2)
                 losers.append(loser_name)
 
-            player_names = [player['name'] for player in
-                            game['player_list']]
+            player_names = [player.Name() for player in
+                            game.PlayerList()]
             winner_idx = player_names.index(win_name)
             multiplayer_win_probs = skill_model.MultiplayerWinProb(
                 player_names)
@@ -381,10 +456,9 @@ class SkillRatings:
             for player_name in delta:
                 skill_info = self.GetSkillInfo(player_name)
                 skill_info.games_played += 1
-                skill_info.exp_wins += 1.0 / (len(game['player_list']))
+                skill_info.exp_wins += 1.0 / (len(game.PlayerList()))
 
-                homeworld = Homeworld(GetPlayerResultForName(game,
-                                                             player_name))
+                homeworld = game.PlayerResultForName(player_name).Homeworld()
 
 		self.rating_by_homeworld_flow[player_name][homeworld] += (
                     delta[player_name])
@@ -442,8 +516,8 @@ class SkillRatings:
     def ComputeRatingBuckets(self, games, num_buckets):
         skills_weighted_by_games = []
         for g in games:
-            for p in g['player_list']:
-                rating = self.GetSkillInfo(p['name']).rating
+            for p in g.PlayerList():
+                rating = self.GetSkillInfo(p.Name()).rating
                 skills_weighted_by_games.append(rating)
         skills_weighted_by_games.sort()
         num_player_game_results = float(len(skills_weighted_by_games))
@@ -455,7 +529,7 @@ class SkillRatings:
         return skill_sections
 
     def PlayerSkillBucket(self, player_name, skill_sections):
-        player_rating = self.ratings[player_name].rating
+        player_rating = self.skill_model.GetSkillInfo(player_name).rating
         skill_level = 0
         for bucket in skill_sections:
             if player_rating > bucket:
@@ -480,7 +554,7 @@ class BucketInfo:
                  norm_win_points, norm_win_points_ssd, frequency):
         self.key = key
         self.win_points = win_points
-        self.win_points_var = win_points_ssd
+        self.win_points_ssd = win_points_ssd
         self.frequency = frequency
         self.norm_win_points = norm_win_points
         self.norm_win_points_ssd = norm_win_points_ssd
@@ -513,20 +587,17 @@ def ComputeByCardStats(player_results, card_yielder, skill_ratings):
 
 def ComputeWinningStatsByCardPlayed(player_results, skill_ratings):
     def NonHomeworldCardYielder(player_result, game):
-        for idx, card in enumerate(player_result['cards']):
+        for idx, card in enumerate(player_result.Cards()):
             if not (idx == 0 and card in HOMEWORLDS or
                     card == 'Gambling World'):
                 yield card
     return FilterDiscardables(ComputeByCardStats(
             player_results, NonHomeworldCardYielder, skill_ratings))
 
-def GoalGame(g):
-    return 'goals' in g
-
 def GoalInfluenceOnCardStats(player_results, skill_ratings):
     with_goals, without_goals = [], []
     for player_result in player_results:
-        if GoalGame(player_result['game']):
+        if player_result.Game().GoalGame():
             with_goals.append(player_result)
         else:
             without_goals.append(player_result)
@@ -538,20 +609,20 @@ def GoalInfluenceOnCardStats(player_results, skill_ratings):
 def GameSizeInfluenceOnCardStats(player_results, skill_ratings):
     games_by_size = collections.defaultdict(list)
     for player_result in player_results:
-        game_size = len(player_result['game']['player_list'])
+        game_size = len(player_result.Game().PlayerList())
         games_by_size[game_size].append(player_result)
     return [ComputeWinningStatsByCardPlayed(games_by_size[size], skill_ratings)
             for size in sorted(games_by_size.keys())]
 
 def FilterOutNonGoals(games):
-    return [g for g in games if GoalGame(g)]
+    return [g for g in games if g.GoalGame()]
 
 class HomeworldGoalAnalysis:
     def __init__(self, games):
         games = FilterOutNonGoals(games)
         def HomeworldGoalYielder(player_result, game):
-            for goal in game['goals']:
-                yield Homeworld(player_result), goal
+            for goal in game.Goals():
+                yield player_result.Homeworld(), goal
         self.bucketted_by_homeworld_goal = ComputeStatsByBucketFromGames(
             games, HomeworldGoalYielder)
         self.keyed_by_homeworld_goal = {}
@@ -593,30 +664,46 @@ class HomeworldGoalAnalysis:
 
 
 # not called, might be broken by refactor of bucketinfo
-def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings, card_info):
+def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings):
     untied_games = FilterOutTies(games)
-    NUM_SKILL_BUCKETS = 3
+    NUM_SKILL_BUCKETS = 5
     skill_buckets = skill_ratings.ComputeRatingBuckets(untied_games,
                                                        NUM_SKILL_BUCKETS)
     print skill_buckets
 
-    def HomeworldSkillYielder(player_result):
-        name = player_result['name']
+    def HomeworldSkillYielder(player_result, game):
+        for p_result in game.PlayerList():
+            if (skill_ratings.PlayerSkillBucket(
+                    p_result.Name(), skill_buckets) != 
+                NUM_SKILL_BUCKETS - 1):
+                return
+
+        name = player_result.Name()
         skill_bucket = skill_ratings.PlayerSkillBucket(name, skill_buckets)
-        yield (Homeworld(player_result), skill_bucket)
+        yield (player_result.Homeworld(), skill_bucket)
 
     bucketted_stats = ComputeStatsByBucketFromGames(untied_games,
                                                     HomeworldSkillYielder)
     keyed_by_hw_rough_skill = {}
     for bucket in bucketted_stats:
-        keyed_by_hw_rough_skill[bucket.key] = (bucket.win_points,
-                                               bucket.expected_wins)
+        keyed_by_hw_rough_skill[bucket.key] = bucket
+                                               
     print keyed_by_hw_rough_skill
     ret = {}
+    interesting_skill_range = range(NUM_SKILL_BUCKETS - 1, NUM_SKILL_BUCKETS)
     for homeworld in HOMEWORLDS:
         ret[homeworld] = []
-        for i in range(NUM_SKILL_BUCKETS):
+        for i in interesting_skill_range:
             ret[homeworld].append(keyed_by_hw_rough_skill[(homeworld, i)])
+
+    for k in ret:
+        print k.ljust(25),
+        for win_bucket in ret[k]:
+            print ('%.3f' % win_bucket.win_points).ljust(8),
+            print '+-', ('%.3f' % (win_bucket.win_points_ssd * 2)).ljust(8),
+            print win_bucket.frequency
+        print 
+
     return ret
 
 class OverviewStats:
@@ -627,18 +714,18 @@ class OverviewStats:
         race_type = collections.defaultdict(int)
 
         for game in games:
-            self.max_game_no = max(self.max_game_no, game['game_no'])
+            self.max_game_no = max(self.max_game_no, game.GameNo())
             adv = ''
-            if game['advanced'] == 1:
+            if game.Advanced() == 1:
                 adv = ' adv'
 
-            players_size_str = '%dp%s' % ( len(game['player_list']), adv )
+            players_size_str = '%dp%s' % ( len(game.PlayerList()), adv )
             player_size[players_size_str] += 1
 
             race_type_str = 'Base'
-            if game['expansion'] == 1:
+            if game.Expansion() == 1:
                 race_type_str = 'Gathering Storm'
-            if 'goals' in game['player_list'][0]:
+            if game.GoalGame():
                 race_type_str += ' with Goals'
 
             race_type[race_type_str] += 1
@@ -741,7 +828,7 @@ def AdjustedWinPoints(cardWinInfo):
 
 def NonTiedGatheringStormGames(games):
     return FilterOutTies(
-        [g for g in games if g['expansion'] == 1])
+        [g for g in games if g.Expansion() == 1])
     
 def RenderGoalVsNonGoalPage(games, rankings_by_game_type):
     overview = OverviewStats(games)
@@ -812,33 +899,30 @@ def RenderTopPage(games, rankings_by_game_type):
 def PlayerToGameList(games):
     players_to_games = collections.defaultdict(list)
     for game in games:
-        for player in game['player_list']:
-            players_to_games[player['name']].append(game)
+        for player in game.PlayerList():
+            players_to_games[player.Name()].append(game)
     return players_to_games
 
 def WritePlayerFloatPairsAsTableRows(output_file, pairs):
     for s, f in pairs:
         output_file.write('<tr><td>%s</td><td>%.1f</td></tr>\n' % (s, f))
 
-def GoalGame(game):
-    return 'goals' in game and game['goals']
-
 def TwoPlayerAdvanced(game):
-    return len(game['player_list']) == 2 and game['advanced']
+    return len(game.PlayerList()) == 2 and game.Advanced()
 
 def TwoPlayerNotAdvanced(game):
-    return  len(game['player_list']) == 2 and not game['advanced']
+    return  len(game.PlayerList()) == 2 and not game.Advanced()
 
 class RankingByGameTypeAnalysis:
     def __init__(self, games):
         self.filters = [
             ('all games', 10, lambda game: True),
-            ('goal games', 10, lambda game: GoalGame(game)),
-            ('non goal games', 10, lambda game: not GoalGame(game)),
+            ('goal games', 10, lambda game: game.GoalGame()),
+            ('non goal games', 10, lambda game: not game.GoalGame()),
             ('2 player adv', 10, TwoPlayerAdvanced),
             ('2 player not adv', 10, TwoPlayerNotAdvanced),
-            ('3 player', 7, lambda game: len(game['player_list']) == 3),
-            ('4 player', 5, lambda game: len(game['player_list']) == 4)
+            ('3 player', 7, lambda game: len(game.PlayerList()) == 3),
+            ('4 player', 5, lambda game: len(game.PlayerList()) == 4)
             ]
         self.filt_game_lists = [[] for filt in self.filters]
         for game in games:
@@ -897,25 +981,24 @@ class RankingByGameTypeAnalysis:
 def KeyGamesByOpponent(target_player, games):
     ret = collections.defaultdict(list)
     for game in games[::-1]:
-        for player in game['player_list']:
-            if player['name'] != target_player:
-                ret[player['name']].append(game)
+        for player in game.PlayerList():
+            if player.Name() != target_player:
+                ret[player.Name()].append(game)
     return ret
 
 def AbbrevHomeworld(homeworld_name):
     return ''.join(x[0] for x in homeworld_name.split())
 
 def RenderTableauShort(player_result):
-    abbrev_homeworld = AbbrevHomeworld(Homeworld(player_result))
-    return '%s-%d' % (abbrev_homeworld, int(player_result['points']))
-
+    abbrev_homeworld = AbbrevHomeworld(player_result.Homeworld())
+    return '%s-%d' % (abbrev_homeworld, int(player_result.Points()))
 
 def GetResultsForNames(game, source, target):
     source_result, target_result = None, None
-    for player_result in game['player_list']:
-        if player_result['name'] == source:
+    for player_result in game.PlayerList():
+        if player_result.Name() == source:
             source_result = player_result
-        elif player_result['name'] == target:
+        elif player_result.Name() == target:
             target_result = player_result
     assert source_result != None, 'could not find %s in %s' % (
         source, str(game))
@@ -927,9 +1010,9 @@ WIN, LOSE, TIE = range(3)
 OUTCOME_TO_COLOR = ['green', 'red', '#444444']
 
 def OutcomeWithPerspective(game, source_result, target_result):
-    if source_result['win_points'] == len(game['player_list']):
+    if source_result.WinPoints() == len(game.PlayerList()):
         return WIN
-    elif source_result['win_points'] == 0 and target_result['win_points'] > 0:
+    elif source_result.WinPoints() == 0 and target_result.WinPoints() > 0:
         return LOSE
     return TIE
 
@@ -948,17 +1031,17 @@ def RenderGameWithPerspective(game, source, target):
 
     return ('<a href="http://genie.game-host.org/game.htm?gid=%d">' +
             '<font color="%s">' + 
-            '%s %s</font></a>') % (game['game_no'], color,
+            '%s %s</font></a>') % (game.GameNo(), color,
                                    RenderTableauShort(source_result),
                                    RenderTableauShort(target_result))
     
 def ComputeSinglePlayerWinningStats(player, player_games, rating_system):
     gathering_storm_tableaus = []
     for game in FilterOutTies(player_games):
-        if game['expansion'] != 1:
+        if game.Expansion() != 1:
             continue
-        for player_result in game['player_list']:
-            if player_result['name'] == player:
+        for player_result in game.PlayerList():
+            if player_result.Name() == player:
                 gathering_storm_tableaus.append(player_result)
 
     return ComputeWinningStatsByCardPlayed(gathering_storm_tableaus, 
@@ -1043,6 +1126,9 @@ def main():
     if len(sys.argv) > 1:
         debugging_on = True
 
+    if not os.access('output', os.O_RDONLY):
+        os.mkdir('output')
+
     if debugging_on:
         games = json.loads(open('terse_games.json').read())
     else:
@@ -1050,10 +1136,15 @@ def main():
         open('terse_games.json', 'w').write(
             json.dumps(random.sample(games, 1000)))
 
-    DecorateTableausInGames(games)
+    games = [Game(g) for g in games]
+    
     by_game_type_analysis = RankingByGameTypeAnalysis(games)
-    if not os.access('output', os.O_RDONLY):
-        os.mkdir('output')
+    
+    gs_games = [g for g in games if g.Expansion()]
+
+    ComputeWinStatsByHomeworldSkillLevel(
+        gs_games, by_game_type_analysis.AllGamesRatings())
+
     RenderTopPage(games, by_game_type_analysis)
     RenderGoalVsNonGoalPage(games, by_game_type_analysis)
     RenderGameSizePage(games, by_game_type_analysis)
