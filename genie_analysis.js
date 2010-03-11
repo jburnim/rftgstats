@@ -329,7 +329,6 @@ function RenderCardWinInfo(data, canvas, wind) {
     }
 }
 
-
 function VectorMul(v, mul) {
     var ret = {};
     for (var key in v) {
@@ -352,46 +351,88 @@ function VectorAdd(a, b) {
     return ret;
 }
 
-function RenderCardWinAnimationInfo(cardWinAnimationInfo, canvas) {
-    // cardWinAnimationInfo is sufficiently complicated that it probably
-    // deserves to be a class, of at least an array of WinInfoFrame classes.
-    var duration = 5000;
-    var start = new Date().getTime();
-    var window = WindowBound(canvas.width, canvas.height);
-    for (var i = 0; i < cardWinAnimationInfo.length; ++i) {
-	window.ExtendToFit(cardWinAnimationInfo[i]);
+function CardDataAnimation(divId) {
+    var animator = {};
+    var containingDiv = document.getElementById(divId);
+    var stopButtonId = divId + 'Stop';
+    var startButtonId = divId + 'Start';
+    containingDiv.innerHTML = '<table><tr><td>Winning Rate</td>' +
+	'<td><canvas id="cardWinAnimationCanvas" height="600" width="800">' +
+	'</canvas></td></tr>' + 
+	'<tr>' + 
+	'<td></td><td><center>' +
+	'Probability instance of card appears on tableau</center></td>' + 
+	'</tr>' +
+	'<tr><td><input type="button" value="Stop" id=' + stopButtonId + '>' +
+	'</input></td></tr>' +
+	'</table>';
+
+    document.getElementById(stopButtonId).onclick = function() { 
+	animator.Stop();
     }
-    var doneNext = false;
-    setInterval(function() {
-	    var now = new Date().getTime();
-	    var elapsed = now - start;
-	    //console.log(elapsed);
-	    var loFrame = Math.floor(elapsed / duration);
-	    var hiFrame = loFrame + 1;
-	    var interp = elapsed / duration - loFrame;
-	    if (hiFrame >= cardWinAnimationInfo.length) {
-		if (!doneNext) {
-		    loFrame = hiFrame = cardWinAnimationInfo.length - 1;
-		    doneNext = true;
+    animator.Stop = function() {
+	clearInterval(animator.interval);
+    }
+    animator.Render = function(animInfo) {
+	var canvas = document.getElementById('cardWinAnimationCanvas');
+	var duration = 15000;
+	var start = new Date().getTime();
+	var window = WindowBound(canvas.width, canvas.height);
+	for (var i = 0; i < animInfo.length; ++i) {
+	    window.ExtendToFit(animInfo[i].data);
+	}
+	var doneNext = false;
+	animator.interval = setInterval(function() {
+		var now = new Date().getTime();
+		var elapsed = now - start;
+		//console.log(elapsed);
+		var loFrame = Math.floor(elapsed / duration);
+		var hiFrame = loFrame + 1;
+		var interp = elapsed / duration - loFrame;
+		if (hiFrame >= animInfo.length) {
+		    if (!doneNext) {
+			loFrame = hiFrame = animInfo.length - 1;
+			doneNext = true;
+		    }
+		    else {
+			return;
+		    }
 		}
-		else {
-		    return;
-		}
-	    }
-	    var interpData = {};
-	    for (var cardName in cardWinAnimationInfo[loFrame]) {
-		if (!(cardName in cardWinAnimationInfo[hiFrame])) {
-		    throw cardName + " not in hiFrame, confused!";
-		}
-		loFrameCardData = cardWinAnimationInfo[loFrame][cardName];
-		hiFrameCardData = cardWinAnimationInfo[hiFrame][cardName];
 		var sInterp = interp * interp * (3 - 2 * interp);
-		interpData[cardName] = 
-		    VectorAdd(VectorMul(loFrameCardData, 1 - sInterp),
-			      VectorMul(hiFrameCardData, sInterp));
-	    }
-	    RenderCardWinInfo(interpData, canvas, window);
-	}, 50);
+		var interpData = {};
+		for (var cardName in animInfo[loFrame].data) {
+		    if (!(cardName in animInfo[hiFrame].data)) {
+			throw cardName + " not in hiFrame, confused!";
+		    }
+		    loFrameCardData = animInfo[loFrame].data[cardName];
+		    hiFrameCardData = animInfo[hiFrame].data[cardName];
+
+		    interpData[cardName] = 
+			VectorAdd(VectorMul(loFrameCardData, 1 - sInterp),
+				  VectorMul(hiFrameCardData, sInterp));
+		}
+		RenderCardWinInfo(interpData, canvas, window);
+
+		var ctx = canvas.getContext('2d');
+		var fillText = GuardFillText(ctx);
+		function RenderInterpBar(title, x, y, interpVal) {
+		    fillText(title, x, y);
+		    var barWidth = canvas.width * interpVal / 10;
+		    ctx.fillRect(x - barWidth, y - 5,
+				 barWidth, 10);
+		}
+		for (var i = 0; i < animInfo.length; ++i) {
+		    var interpVal = 0.0;
+		    if (i == loFrame) interpVal = 1 - sInterp;
+		    else if (i == hiFrame) interpVal = sInterp;
+		    RenderInterpBar(animInfo[i].title, 
+				    canvas.width * 8 / 10, 
+				    canvas.height * 4/5 + 20 * i, 
+				    interpVal);
+		}
+	    }, 50);
+    }    
+    return animator;
 }
 
 function drawCard(context, x, y, card) {

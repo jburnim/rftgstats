@@ -13,6 +13,8 @@ import sys
 BASE_SKILL = 1500
 MOVEMENT_CONST = 15
 
+GOOD_TYPES = [ "Novelty", "Rare", "Genes", "Alien"]
+PROD_TYPES = [ "Windfall", "Production"]
 
 HOMEWORLDS = ["Alpha Centauri", "Epsilon Eridani", "Old Earth",
               "Ancient Race", "Damaged Alien Factory",
@@ -113,6 +115,12 @@ because players do not have much of an incentive to game it.</li>
 </ul>
 """
 
+def GoalVector(goals):
+    ret = [0] * len(GOALS)
+    for goal in goals:
+        ret[GOALS.index(goal)] = 1
+    return ret
+
 def GetAndRemove(dict, key):
     ret = dict[key]
     del dict[key]
@@ -131,6 +139,7 @@ class Game:
         winners = self.GameWinners()
         for player_result in winners:
             player_result.SetWinPoints(n / len(winners))
+        self.player_list.sort(key = PlayerResult.WinPoints, reverse=True)
 
         self.goals = []
         if 'goals' in game_dict:
@@ -141,6 +150,11 @@ class Game:
         self.advanced = GetAndRemove(game_dict, 'advanced')
         
         assert len(game_dict) == 0
+
+    def __str__(self):
+        player_info_string = '\t' + '\n\t'.join(
+            str(p) for p in self.PlayerList())
+        return '%d %s\n' % (self.GameNo(), player_info_string)
 
     def WinningScore(self):
         return max(result.Score() for result in self.PlayerList())
@@ -157,6 +171,9 @@ class Game:
 
     def Goals(self):
         return self.goals
+
+    def GoalVector(self):
+        return GoalVector(self.Goals())
 
     def GoalGame(self):
         return len(self.goals) > 0
@@ -223,25 +240,139 @@ class PlayerResult:
     def Cards(self):
         return self.cards
 
+    def __str__(self):
+        card_str = ','.join(self.cards)
+        goal_str = ','.join(self.goals)
+        return '%s %d %d %s <%s>' % (
+            self.Name(), self.points, self.chips, card_str, goal_str)
+
+    def __repr__(self):
+        return self.__str__()
+
+    def WonGoalVector(self):
+        return GoalVector(self.goals)
+
+    def CardVector(self, record_places = True):
+        card_vec = [0] * DeckInfo.NumCards()
+        dw_comp = 0
+        if (self.Homeworld() == 'Doomed World' and 
+            self.Cards()[0] != 'Doomed World'):
+            dw_comp += 1
+            
+        card_vec[DeckInfo.CardIndexByName(self.Homeworld())] = 1
+        for idx, card in enumerate(self.Cards()):
+            card_ind = DeckInfo.CardIndexByName(card)
+            if record_places:
+                card_vec[card_ind] = dw_comp + idx + 1
+            else:
+                card_vec[card_ind] = 1
+        # handle doomed world
+
+        return card_vec
+
+    def _TableauSizeRelativeToMax(self):
+        other_max = max(len(player_result.Cards()) for player_result in 
+                        self.Game().PlayerList() if 
+                        player_result.Name() != self.Name())
+        return len(self.Cards()) - other_max
+
+    def FeatureSummary(self):
+        good_counts = [0] * len(GOOD_TYPES)
+        prod_counts = [0] * len(PROD_TYPES)
+        dev_count = 0
+        dev_count_6_cost = 0
+        world_count = 0
+        mil_world_count = 0
+        mil_strength = 0
+        
+        for card in self.Cards():
+            if DeckInfo.CardIsDev(card):
+                dev_count += 1
+                if DeckInfo.Cost(card) == 6:
+                    dev_count_6_cost += 1
+            else:
+                world_count += 1
+
+                good_type = DeckInfo.GoodType(card)
+                if good_type:
+                    good_counts[GOOD_TYPES.index(good_type)] += 1
+
+                prod_type = DeckInfo.ProductionPower(card)
+                if prod_type:
+                    prod_counts[PROD_TYPES.index(prod_type)] += 1
+
+                mil_world_count += DeckInfo.IsMilWorld(card)
+                mil_strength += DeckInfo.MilitaryStrength(card)
+
+        return prod_counts + good_counts + [
+            self.points / 30.0, self.chips / 12.0, dev_count, dev_count_6_cost, 
+            world_count, mil_world_count, mil_strength / 2.0, 
+            self._TableauSizeRelativeToMax()] + self.WonGoalVector()
+            
+    def FullFeatureVector(self):
+        return self.CardVector(record_places=True) + \
+            self.Game().GoalVector() + self.FeatureSummary() + [
+            self.Name(), self.Game().GameNo()]
+            
+
     def Name(self):
         return self.name
+
         
-def InitCardInfoDict():
+def InitDeckInfoDict():
     card_info = list(csv.DictReader(open('card_attributes.csv', 'r')))
     card_info_dict = dict((x["Name"], x) for x in card_info)
-    return card_info_dict
+    card_names = (x["Name"] for x in card_info)
+    card_names = list(set(card_names)) # remove dup gambling world
+    card_names.sort()
+    card_name_order_dict = dict((name, idx) for idx, name in
+                                enumerate(card_names))
+    #pprint.pprint(card_name_order_dict)
+    return card_info_dict, card_name_order_dict
 
-class CardInfo:
-    card_info_dict = InitCardInfoDict()
+class DeckInfo:
+    card_info_dict, card_name_order = InitDeckInfoDict()
 
     @staticmethod
     def CardFrequencyInDeck(card_name):
-        card = CardInfo.card_info_dict[card_name]
+        card = DeckInfo.card_info_dict[card_name]
         if card['Name'] == 'Contact Specialist':
             return 3
         if card['Type'] == 'Development':
             return 2 - (card['Cost'] == '6')
         return 1
+
+    @staticmethod
+    def CardIndexByName(card_name):
+        return DeckInfo.card_name_order[card_name]
+
+    @staticmethod
+    def NumCards():
+        return len(DeckInfo.card_name_order)
+
+    @staticmethod
+    def CardIsDev(card_name):
+        return DeckInfo.card_info_dict[card_name]['Type'].strip()== 'Development'
+
+    @staticmethod
+    def GoodType(card_name):
+        return DeckInfo.card_info_dict[card_name]['Goods'].strip()
+
+    @staticmethod
+    def ProductionPower(card_name):
+        return DeckInfo.card_info_dict[card_name]['Production'].strip()
+
+    @staticmethod
+    def IsMilWorld(card_name):
+        return bool(DeckInfo.card_info_dict[card_name]['Military'].strip())
+
+    @staticmethod
+    def MilitaryStrength(card_name):
+        return int(DeckInfo.card_info_dict[card_name]['Strength'])
+
+    @staticmethod
+    def Cost(card_name):
+        return int(DeckInfo.card_info_dict[card_name]['Cost'])
 
 class RandomVariableObserver:
     def __init__(self):
@@ -572,7 +703,7 @@ def ComputeByCardStats(player_results, card_yielder, skill_ratings):
         prob_per_card_name = bucket_info.frequency / total_tableaus
         prob_per_card_name_var = prob_per_card_name * (1 - prob_per_card_name)
         prob_per_card_name_ssd = (prob_per_card_name_var / total_tableaus) ** .5
-        freq_in_deck = CardInfo.CardFrequencyInDeck(card)
+        freq_in_deck = DeckInfo.CardFrequencyInDeck(card)
         prob_per_card = prob_per_card_name / freq_in_deck
         prob_per_card_ssd = prob_per_card_name_ssd / freq_in_deck
         grouped_by_card[card] = {
@@ -602,17 +733,22 @@ def GoalInfluenceOnCardStats(player_results, skill_ratings):
         else:
             without_goals.append(player_result)
     return [
-        ComputeWinningStatsByCardPlayed(without_goals, skill_ratings),
-        ComputeWinningStatsByCardPlayed(with_goals, skill_ratings)
+        {'title': 'Without goals',
+         'data': ComputeWinningStatsByCardPlayed(without_goals, skill_ratings)},
+        {'title': 'With goals',
+         'data': ComputeWinningStatsByCardPlayed(with_goals, skill_ratings)}
         ]
 
-def GameSizeInfluenceOnCardStats(player_results, skill_ratings):
+def GameSizeInfluenceOnCardStats(player_results, ratings):
     games_by_size = collections.defaultdict(list)
     for player_result in player_results:
         game_size = len(player_result.Game().PlayerList())
         games_by_size[game_size].append(player_result)
-    return [ComputeWinningStatsByCardPlayed(games_by_size[size], skill_ratings)
-            for size in sorted(games_by_size.keys())]
+    return [
+        {'title': 'Game Size %d' % size,
+         'data': ComputeWinningStatsByCardPlayed(games_by_size[size], ratings)}
+        for size in sorted(games_by_size.keys())
+        ]
 
 def FilterOutNonGoals(games):
     return [g for g in games if g.GoalGame()]
@@ -644,7 +780,8 @@ class HomeworldGoalAnalysis:
             html += '<tr><td>%s</td><td>%.3f</td>' % (homeworld, win_points)
             for goal in GOALS:
                 diff = (
-                    self.keyed_by_homeworld_goal[(homeworld, goal)] - win_points)
+                    self.keyed_by_homeworld_goal[(homeworld, goal)] -
+                    win_points)
                 html += '<td>%.3f</td>' % diff
             html += '</tr>\n'
         html += '</table>\n'
@@ -783,24 +920,16 @@ Probability instance of card appears on tableau</center></td>
 
 def RenderCardAnimationGraph(out_file, animated_win_info):
     out_file.write("""
-<p>
-<table><tr><td>Winning Rate</td>
-   <td><canvas id="cardWinAnimationCanvas" height="600" width="800"></canvas>
-</td>
-</tr>
-<tr>
-<td></td><td><center>
-Probability instance of card appears on tableau</center></td>
-</tr>
-</table>
+<p><div id="cardDataAnimHolder">
 <script type="text/javascript">
+window.onload = function() {
   var cardWinAnimationInfo = %s;
-  RenderCardWinAnimationInfo(cardWinAnimationInfo,
-document.getElementById("cardWinAnimationCanvas"));
+  var animation = CardDataAnimation("cardDataAnimHolder");
+  animation.Render(cardWinAnimationInfo);
+}
 </script>
 </p>
 """ % json.dumps(animated_win_info, indent=2))
-
     
 
 def AdjustedWinPoints(cardWinInfo):
@@ -810,7 +939,7 @@ def AdjustedWinPoints(cardWinInfo):
         c = cardWinInfo[card]
         norm_win_points_per_game = c['prob_per_card'] * c['norm_win_points']
         c['norm_win_points_per_game'] = norm_win_points_per_game
-        if (CardInfo.card_info_dict[card]['Production'] == 'Production' and
+        if (DeckInfo.card_info_dict[card]['Production'] == 'Production' and
             not card in HOMEWORLDS):
             observed_norm_win_points.append((card, c))
         if card == 'Plague World':
@@ -840,6 +969,8 @@ def RenderGoalVsNonGoalPage(games, rankings_by_game_type):
         PlayerResultsFromGames(gs_games), 
         rankings_by_game_type.AllGamesRatings())
     RenderCardAnimationGraph(out, goal_influence_data)
+    open('output/goals_vs_nongoals.json', 'w').write(json.dumps(
+        goal_influence_data))
     out.write('</html>')
 
 def RenderGameSizePage(games, rankings_by_game_type):
@@ -852,8 +983,9 @@ def RenderGameSizePage(games, rankings_by_game_type):
         PlayerResultsFromGames(gs_games), 
         rankings_by_game_type.AllGamesRatings())
     RenderCardAnimationGraph(out, game_size_data)
+    open('output/game_size.json', 'w').write(json.dumps(
+        game_size_data))
     out.write('</html>')
-        
 
 def RenderTopPage(games, rankings_by_game_type):
     overview = OverviewStats(games)
@@ -1109,7 +1241,7 @@ def CopyOrLink(fn, debugging_on):
 
 def CopySupportFilesToOutput(debugging_on):
     open('card_attrs.js', 'w').write('var cardInfo = %s;' % 
-                                     json.dumps(CardInfo.card_info_dict, 
+                                     json.dumps(DeckInfo.card_info_dict, 
                                                 indent=2))
     CopyOrLink('card_attrs.js', debugging_on)
     CopyOrLink('genie_analysis.js', debugging_on)
@@ -1121,9 +1253,67 @@ def CopySupportFilesToOutput(debugging_on):
     if not os.access('output/images', os.O_RDONLY):
         shutil.copytree('images', 'output/images')
 
-def main():
+def VivaFringeFormat(games, ratings, output_file):
+    gs_2_player_games = [g for g in NonTiedGatheringStormGames(games) if
+                         len(g.PlayerList()) == 2]
+    #game_won, rating_1,rating_2,card_played_1,card_played_2,...
+
+    for game in gs_2_player_games:
+        cur_rating = []
+        for player_result in game.PlayerList():
+            cur_rating.append(
+                ratings.RatingAtGameNo(game.GameNo(), player_result.Name()))
+        winner = game.GameWinners()[0]
+        for idx, player_result in enumerate(game.PlayerList()):
+            won = 0
+            if winner.Name() == player_result.Name():
+                won = 1
+            output_file.write('%d,%d,%d,' % (
+                won, cur_rating[idx], cur_rating[1 - idx]))
+            full_vector = player_result.FullFeatureVector()
+            output_file.write(','.join(str(idx) for idx in full_vector))
+            output_file.write('\n')
+
+def ToNumpyMat(player_results):
+    import numpy as np
+    return np.array([result.FeatureVector() for result in player_results],
+                    dtype=float)
+
+from scipy.cluster.vq import *
+def ClusterTableaus(tableau_mat, k):
+    centroids, variance = kmeans(tableau_mat, k)
+    code, distance = vq(tableau_mat, centroids)    
+    return centroids, variance, code, distance
+
+def t():
+    games = [Game(g) for g in json.loads(open('condensed_games.json').read())]
+
+    gs_games = [g for g in games if g.Expansion()]
+    gs_tables = []
+    for g in gs_games:
+        gs_tables.extend(g.PlayerList())
+    mat = ToNumpyMat(gs_tables)
+    cents, var, code, dists = ClusterTableaus(mat, 15)
+
+    clusters = collections.defaultdict(list)
+    for tableau, code_val, dist in zip(gs_tables, code, dists):
+        clusters[code_val].append((tableau, dist))
+
+
+    import random
+    for clust_ind, members in clusters.iteritems():
+        print len(members)
+        for member in sorted(members, key = lambda x: x[1])[:3]:
+            print member
+        for member in random.sample(members, 2):
+            print member
+        print
+        
+    return cents, var, code, dists, clusters
+
+def main(argv):
     debugging_on = False
-    if len(sys.argv) > 1:
+    if len(argv) > 1:
         debugging_on = True
 
     if not os.access('output', os.O_RDONLY):
@@ -1137,14 +1327,14 @@ def main():
             json.dumps(random.sample(games, 1000)))
 
     games = [Game(g) for g in games]
-    
     by_game_type_analysis = RankingByGameTypeAnalysis(games)
+    VivaFringeFormat(games, by_game_type_analysis.AllGamesRatings(),
+                     open('gs_2_player.csv', 'w'))
+    print 'exiting early'
+    return
     
-    gs_games = [g for g in games if g.Expansion()]
-
-    ComputeWinStatsByHomeworldSkillLevel(
-        gs_games, by_game_type_analysis.AllGamesRatings())
-
+    if not os.access('output', os.O_RDONLY):
+        os.mkdir('output')
     RenderTopPage(games, by_game_type_analysis)
     RenderGoalVsNonGoalPage(games, by_game_type_analysis)
     RenderGameSizePage(games, by_game_type_analysis)
@@ -1154,4 +1344,4 @@ def main():
     CopySupportFilesToOutput(debugging_on)
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv)
