@@ -16,9 +16,8 @@ Installation
 
 Just include the Javascript file after you've included jQuery.
 
-Note that you need to get a version of Excanvas (I currently suggest
-you take the one bundled with Flot as it contains a bugfix for drawing
-filled shapes) which is canvas emulation on Internet Explorer. You can
+Note that you need to get a version of Excanvas (e.g. the one bundled
+with Flot) which is canvas emulation on Internet Explorer. You can
 include the excanvas script like this:
 
   <!--[if IE]><script language="javascript" type="text/javascript" src="excanvas.pack.js"></script><![endif]-->
@@ -28,7 +27,9 @@ support for VML which excanvas is relying on. It appears that some
 stripped down versions used for test environments on virtual machines
 lack the VML support.
   
-Also note that you need at least jQuery 1.2.1.
+Also note that you need at least jQuery 1.2.6 (but at least jQuery
+1.3.2 is recommended for interactive charts because of performance
+improvements in event handling).
 
 
 Basic usage
@@ -63,7 +64,7 @@ in the file "API.txt". Here's a quick example that'll draw a line from
 
   $.plot($("#placeholder"), [ [[0, 0], [1, 1]] ], { yaxis: { max: 1 } });
 
-The plot function immediately draws the chart and then returns a Plot
+The plot function immediately draws the chart and then returns a plot
 object with a couple of methods.
 
 
@@ -72,9 +73,9 @@ What's with the name?
 
 First: it's pronounced with a short o, like "plot". Not like "flawed".
 
-So "Flot" is like "Plot".
+So "Flot" rhymes with "plot".
 
 And if you look up "flot" in a Danish-to-English dictionary, some up
 the words that come up are "good-looking", "attractive", "stylish",
 "smart", "impressive", "extravagant". One of the main goals with Flot
-is pretty looks. Flot is supposed to be "flot".
+is pretty looks.

@@ -1,3 +1,178 @@
+Flot 0.6
+--------
+
+API changes:
+
+1. Selection support has been moved to a plugin. Thus if you're
+passing selection: { mode: something }, you MUST include the file
+jquery.flot.selection.js after jquery.flot.js. This reduces the size
+of base Flot and makes it easier to customize the selection as well as
+improving code clarity. The change is based on patch from andershol.
+
+2. In the global options specified in the $.plot command,
+"lines", "points", "bars" and "shadowSize" have been moved to a
+sub-object called "series", i.e.
+
+  $.plot(placeholder, data, { lines: { show: true }})
+
+should be changed to
+
+  $.plot(placeholder, data, { series: { lines: { show: true }}})
+
+All future series-specific options will go into this sub-object to
+simplify plugin writing. Backward-compatibility code is in place, so
+old code should not break.
+
+3. "plothover" no longer provides the original data point, but instead
+a normalized one, since there may be no corresponding original point.
+
+4. Due to a bug in previous versions of jQuery, you now need at least
+jQuery 1.2.6. But if you can, try jQuery 1.3.2 as it got some
+improvements in event handling speed.
+
+
+Changes:
+
+- Added support for disabling interactivity for specific data series
+  (request from Ronald Schouten and Steve Upton).
+
+- Flot now calls $() on the placeholder and optional legend container
+  passed in so you can specify DOM elements or CSS expressions to make
+  it easier to use Flot with libraries like Prototype or Mootools or
+  through raw JSON from Ajax responses.
+
+- A new "plotselecting" event is now emitted while the user is making
+  a selection.
+
+- The "plothover" event is now emitted immediately instead of at most
+  10 times per second, you'll have to put in a setTimeout yourself if
+  you're doing something really expensive on this event.
+
+- The built-in date formatter can now be accessed as
+  $.plot.formatDate(...) (suggestion by Matt Manela) and even
+  replaced.
+
+- Added "borderColor" option to the grid (patch from Amaury Chamayou
+  and patch from Mike R. Williamson).
+
+- Added support for gradient backgrounds for the grid, take a look at
+  the "setting options" example (based on patch from Amaury Chamayou,
+  issue 90).
+
+- Gradient bars (suggestion by stefpet).
+  
+- Added a "plotunselected" event which is triggered when the selection
+  is removed, see "selection" example (suggestion by Meda Ugo);
+
+- The option legend.margin can now specify horizontal and vertical
+  margins independently (suggestion by someone who's annoyed).
+
+- Data passed into Flot is now copied to a new canonical format to
+  enable further processing before it hits the drawing routines. As a
+  side-effect, this should make Flot more robust in the face of bad
+  data (and fixes issue 112).
+
+- Step-wise charting: line charts have a new option "steps" that when
+  set to true connects the points with horizontal/vertical steps
+  instead of diagonal lines.
+
+- The legend labelFormatter now passes the series in addition to just
+  the label (suggestion by Vincent Lemeltier).
+
+- Horizontal bars (based on patch by Jason LeBrun).
+
+- Support for partial bars by specifying a third coordinate, i.e. they
+  don't have to start from the axis. This can be used to make stacked
+  bars.
+
+- New option to disable the (grid.show).
+
+- Added pointOffset method for converting a point in data space to an
+  offset within the placeholder.
+  
+- Plugin system: register an init method in the $.flot.plugins array
+  to get started, see PLUGINS.txt for details on how to write plugins
+  (it's easy). There are also some extra methods to enable access to
+  internal state.
+
+- Hooks: you can register functions that are called while Flot is
+  crunching the data and doing the plot. This can be used to modify
+  Flot without changing the source, useful for writing plugins. Some
+  hooks are defined, more are likely to come.
+  
+- Threshold plugin: you can set a threshold and a color, and the data
+  points below that threshold will then get the color. Useful for
+  marking data below 0, for instance.
+
+- Stack plugin: you can specify a stack key for each series to have
+  them summed. This is useful for drawing additive/cumulative graphs
+  with bars and (currently unfilled) lines.
+
+- Crosshairs plugin: trace the mouse position on the axes, enable with
+  crosshair: { mode: "x"} (see the new tracking example for a use).
+
+- Image plugin: plot prerendered images.
+
+- Navigation plugin for panning and zooming a plot.
+
+- More configurable grid.
+
+- Axis transformation support, useful for non-linear plots, e.g. log
+  axes and compressed time axes (like omitting weekends).
+
+- Support for twelve-hour date formatting (patch by Forrest Aldridge).
+
+- The color parsing code in Flot has been cleaned up and split out so
+  it's now available as a separate jQuery plugin. It's included inline
+  in the Flot source to make dependency managing easier. This also
+  makes it really easy to use the color helpers in Flot plugins.
+
+Bug fixes:
+
+- Fixed two corner-case bugs when drawing filled curves (report and
+  analysis by Joshua Varner).
+- Fix auto-adjustment code when setting min to 0 for an axis where the
+  dataset is completely flat on that axis (report by chovy).
+- Fixed a bug with passing in data from getData to setData when the
+  secondary axes are used (issue 65, reported by nperelman).
+- Fixed so that it is possible to turn lines off when no other chart
+  type is shown (based on problem reported by Glenn Vanderburg), and
+  fixed so that setting lineWidth to 0 also hides the shadow (based on
+  problem reported by Sergio Nunes).
+- Updated mousemove position expression to the latest from jQuery (bug
+  reported by meyuchas).
+- Use CSS borders instead of background in legend (fix printing issue 25
+  and 45).
+- Explicitly convert axis min/max to numbers.
+- Fixed a bug with drawing marking lines with different colors
+  (reported by Khurram).
+- Fixed a bug with returning y2 values in the selection event (fix
+  by exists, issue 75).
+- Only set position relative on placeholder if it hasn't already a
+  position different from static (reported by kyberneticist, issue 95).
+- Don't round markings to prevent sub-pixel problems (reported by Dan
+  Lipsitt).
+- Make the grid border act similarly to a regular CSS border, i.e.
+  prevent it from overlapping the plot itself. This also fixes a
+  problem with anti-aliasing when the width is 1 pixel (reported by
+  Anthony Ettinger).
+- Imported version 3 of excanvas and fixed two issues with the newer
+  version. Hopefully, this will make Flot work with IE8 (nudge by
+  Fabien Menager, further analysis by Booink, issue 133).
+- Changed the shadow code for lines to hopefully look a bit better
+  with vertical lines.
+- Round tick positions to avoid possible problems with fractions
+  (suggestion by Fred, issue 130).
+- Made the heuristic for determining how many ticks to aim for a bit
+  smarter.
+- Fix for uneven axis margins (report and patch by Paul Kienzle) and
+  snapping to ticks (concurrent report and patch by lifthrasiir).
+- Fixed bug with slicing in findNearbyItems (patch by zollman).
+- Make heuristic for x axis label widths more dynamic (patch by
+  rickinhethuis).
+- Make sure points on top take precedence when finding nearby points
+  when hovering (reported by didroe, issue 224).
+
 Flot 0.5
 --------
 
