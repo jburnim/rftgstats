@@ -38,20 +38,9 @@ def GetLabels(keys, name):
     return ret
                     
 
-def ReadLabels():
-    labels = set()
-    games = set()
-    for line in open('golden_labels.csv', 'r'):
-        split_line = line.strip().split(',')
-        for label in split_line[2:]:
-            labels.add(label)
-        games.add(int(split_line[1]))
-    labels = sorted(list(labels))
-    return labels, games
-
 def main():
     games = map(compute_stats.Game, json.load(open('terse_games.json', 'r')))
-    keys, labelled_games = ReadLabels()
+    keys, labelled_games = compute_stats.ReadLabels()
 
     random.shuffle(games)
     output_file = open('golden_labels2.csv', 'a', 0)

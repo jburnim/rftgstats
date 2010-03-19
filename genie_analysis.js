@@ -364,14 +364,24 @@ function CardDataAnimation(divId) {
 	'Probability instance of card appears on tableau</center></td>' + 
 	'</tr>' +
 	'<tr><td><input type="button" value="Stop" id=' + stopButtonId + '>' +
-	'</input></td></tr>' +
+	'</input></td>' +
+	'<td>' + 
+	'</tr><input type="button" value="Start" id=' + startButtonId + '>'
 	'</table>';
-
     document.getElementById(stopButtonId).onclick = function() { 
 	animator.Stop();
     }
+    document.getElementById(stopButtonId).onclick = function() { 
+	animator.Start();
+    }
     animator.Stop = function() {
 	clearInterval(animator.interval);
+    }
+    animator.Start = function() {
+	// make graph interuptible.  the key state is in elapsed, pretty much
+	// everything else is derivable from that.  
+
+
     }
     animator.Render = function(animInfo) {
 	var canvas = document.getElementById('cardWinAnimationCanvas');

@@ -1,7 +1,9 @@
 #!/usr/bin/python
 
 import collections
-import csv
+
+from deck_info import DeckInfo, HOMEWORLDS, GOOD_TYPES, PROD_TYPES
+import tableau_scorer
 import math
 import pprint
 import random
@@ -12,14 +14,6 @@ import sys
 
 BASE_SKILL = 1500
 MOVEMENT_CONST = 15
-
-GOOD_TYPES = [ "Novelty", "Rare", "Genes", "Alien"]
-PROD_TYPES = [ "Windfall", "Production"]
-
-HOMEWORLDS = ["Alpha Centauri", "Epsilon Eridani", "Old Earth",
-              "Ancient Race", "Damaged Alien Factory",
-              "Earth's Lost Colony", "New Sparta",
-              "Separatist Colony", "Doomed World"]
 
 GOALS = [
     '4+ Production',
@@ -34,6 +28,7 @@ GOALS = [
     '3 Aliens',
     ]
 
+# move to deck info
 DISCARDABLE_CARDS = ['Doomed World', 'Colony Ship', 'New Military Tactics']
 
 TITLE = 'RFTGStats.com: Race for the Galaxy Statistics'
@@ -148,8 +143,9 @@ class Game:
         self.game_no = GetAndRemove(game_dict, 'game_no')
         self.expansion = GetAndRemove(game_dict, 'expansion')
         self.advanced = GetAndRemove(game_dict, 'advanced')
-        
-        assert len(game_dict) == 0
+
+        if '_id' in game_dict:
+            del game_dict['_id']
 
     def __str__(self):
         player_info_string = '\t' + '\n\t'.join(
@@ -162,6 +158,9 @@ class Game:
     def GameWinners(self):
         max_score = self.WinningScore()
         return [p for p in self.PlayerList() if p.Score() == max_score]
+
+    def Tied(self):
+        return len(self.GameWinners()) > 1
 
     def PlayerList(self):
         return self.player_list
@@ -237,8 +236,17 @@ class PlayerResult:
     def Score(self):
         return self.points * 100 + self.goods + self.hand
 
+    def Chips(self):
+        return self.chips
+
     def Cards(self):
         return self.cards
+
+    def GoalVector(self, weight = 1):
+        ret = [0] * len(GOALS)
+        for goal in self.goals:
+            ret[GOALS.index(goal)] = weight
+        return ret
 
     def __str__(self):
         card_str = ','.join(self.cards)
@@ -266,8 +274,6 @@ class PlayerResult:
                 card_vec[card_ind] = dw_comp + idx + 1
             else:
                 card_vec[card_ind] = 1
-        # handle doomed world
-
         return card_vec
 
     def _TableauSizeRelativeToMax(self):
@@ -293,86 +299,30 @@ class PlayerResult:
             else:
                 world_count += 1
 
-                good_type = DeckInfo.GoodType(card)
-                if good_type:
-                    good_counts[GOOD_TYPES.index(good_type)] += 1
-
-                prod_type = DeckInfo.ProductionPower(card)
-                if prod_type:
-                    prod_counts[PROD_TYPES.index(prod_type)] += 1
+                good_counts[DeckInfo.GoodType(card)] += 1
+                prod_counts[DeckInfo.ProductionPower(card)] += 1
 
                 mil_world_count += DeckInfo.IsMilWorld(card)
                 mil_strength += DeckInfo.MilitaryStrength(card)
 
         return prod_counts + good_counts + [
-            self.points / 30.0, self.chips / 12.0, dev_count, dev_count_6_cost, 
+            #self.points / 30.0,
+            self.chips / 12.0, dev_count, dev_count_6_cost, 
             world_count, mil_world_count, mil_strength / 2.0, 
-            self._TableauSizeRelativeToMax()] + self.WonGoalVector()
+            self._TableauSizeRelativeToMax()
+            ] + self.WonGoalVector()
             
-    def FullFeatureVector(self):
+    def AlexFeatureVector(self):
         return self.CardVector(record_places=True) + \
             self.Game().GoalVector() + self.FeatureSummary() + [
             self.Name(), self.Game().GameNo()]
-            
+
+    def FullFeatureVector(self):
+        return self.CardVector(record_places=False) + self.FeatureSummary()
 
     def Name(self):
         return self.name
 
-        
-def InitDeckInfoDict():
-    card_info = list(csv.DictReader(open('card_attributes.csv', 'r')))
-    card_info_dict = dict((x["Name"], x) for x in card_info)
-    card_names = (x["Name"] for x in card_info)
-    card_names = list(set(card_names)) # remove dup gambling world
-    card_names.sort()
-    card_name_order_dict = dict((name, idx) for idx, name in
-                                enumerate(card_names))
-    #pprint.pprint(card_name_order_dict)
-    return card_info_dict, card_name_order_dict
-
-class DeckInfo:
-    card_info_dict, card_name_order = InitDeckInfoDict()
-
-    @staticmethod
-    def CardFrequencyInDeck(card_name):
-        card = DeckInfo.card_info_dict[card_name]
-        if card['Name'] == 'Contact Specialist':
-            return 3
-        if card['Type'] == 'Development':
-            return 2 - (card['Cost'] == '6')
-        return 1
-
-    @staticmethod
-    def CardIndexByName(card_name):
-        return DeckInfo.card_name_order[card_name]
-
-    @staticmethod
-    def NumCards():
-        return len(DeckInfo.card_name_order)
-
-    @staticmethod
-    def CardIsDev(card_name):
-        return DeckInfo.card_info_dict[card_name]['Type'].strip()== 'Development'
-
-    @staticmethod
-    def GoodType(card_name):
-        return DeckInfo.card_info_dict[card_name]['Goods'].strip()
-
-    @staticmethod
-    def ProductionPower(card_name):
-        return DeckInfo.card_info_dict[card_name]['Production'].strip()
-
-    @staticmethod
-    def IsMilWorld(card_name):
-        return bool(DeckInfo.card_info_dict[card_name]['Military'].strip())
-
-    @staticmethod
-    def MilitaryStrength(card_name):
-        return int(DeckInfo.card_info_dict[card_name]['Strength'])
-
-    @staticmethod
-    def Cost(card_name):
-        return int(DeckInfo.card_info_dict[card_name]['Cost'])
 
 class RandomVariableObserver:
     def __init__(self):
@@ -445,12 +395,9 @@ def PlayerResultsFromGames(games):
 def ComputeStatsByBucketFromGames(games, bucketter, rating_system = None):
     return ComputeStatsByBucketFromPlayerResults(PlayerResultsFromGames(games),
                                                  bucketter, rating_system)
-                                                 
-def GameTied(game):
-    return len(game.GameWinners()) > 1
 
 def FilterOutTies(games):
-    return [g for g in games if not GameTied(g)]
+    return [g for g in games if not g.Tied()]
 
 class PlayerSkillInfo:
     def __init__(self, rating, wins, exp_wins, games_played):
@@ -1274,14 +1221,18 @@ def VivaFringeFormat(games, ratings, output_file):
             output_file.write(','.join(str(idx) for idx in full_vector))
             output_file.write('\n')
 
-def ToNumpyMat(player_results):
+def ToNumpyMat(player_results, training_set):
     import numpy as np
-    return np.array([result.FeatureVector() for result in player_results],
-                    dtype=float)
+    ret = np.array([result.FullFeatureVector() +
+                    training_set.GetTrainingLabels(result, 1)
+                    for result in player_results], dtype=float)
+    whitened_ret = np.nan_to_num(whiten(ret))
+    return whitened_ret
 
-from scipy.cluster.vq import *
 def ClusterTableaus(tableau_mat, k):
-    centroids, variance = kmeans(tableau_mat, k)
+    from scipy.cluster.vq import vq, kmeans, whiten, kmeans2
+    centroids, variance = kmeans2(tableau_mat, k, 100, minit="points")
+    #centroids, variance = kmeans(tableau_mat, k)
     code, distance = vq(tableau_mat, centroids)    
     return centroids, variance, code, distance
 
@@ -1292,46 +1243,218 @@ def t():
     gs_tables = []
     for g in gs_games:
         gs_tables.extend(g.PlayerList())
-    mat = ToNumpyMat(gs_tables)
-    cents, var, code, dists = ClusterTableaus(mat, 15)
+    training_set = TrainingSet()
+    mat = ToNumpyMat(gs_tables, training_set)
+    cents, var, code, dists = ClusterTableaus(mat, 10)
 
     clusters = collections.defaultdict(list)
+    tableau_labels = {}
     for tableau, code_val, dist in zip(gs_tables, code, dists):
         clusters[code_val].append((tableau, dist))
-
+        tableau_labels[(tableau.Name(), tableau.Game().GameNo())] = code_val
 
     import random
     for clust_ind, members in clusters.iteritems():
-        print len(members)
+        print len(members),
+        labels_for_clust = collections.defaultdict(int)
+        for member, dist in members:
+            for idx, val in enumerate(training_set.GetLabels(member)):
+                labels_for_clust[idx] += val
+        for label_ind, val in labels_for_clust.iteritems():
+            if val > 0:
+                print training_set.GetLabelName(label_ind), val,
         for member in sorted(members, key = lambda x: x[1])[:3]:
             print member
         for member in random.sample(members, 2):
             print member
         print
-        
-    return cents, var, code, dists, clusters
+    print training_set.Error(tableau_labels)
 
+
+class TrainingSet:
+    def __init__(self, training_frac=.5, fn=None):
+        if not fn:
+            fn = 'golden_labels.csv'
+
+        self.labelled_tableaus = collections.defaultdict(list)
+        self.labels = set()
+        self.labelled_game_nos = set()
+        for line in open(fn, 'r'):
+            split_line = line.strip().split(',')
+            player, game_no = split_line[0], int(split_line[1])
+            cur_labels = split_line[2:]
+            
+            self.labels.update(cur_labels)
+            self.labelled_tableaus[(player, game_no)] = cur_labels
+            self.labelled_game_nos.add(game_no)
+            
+        self.labels = sorted(list(self.labels))
+        self.training_labels = collections.defaultdict(list)
+        self.testing_labels = collections.defaultdict(list)
+
+        training_size = int(len(self.labelled_tableaus) * training_frac)
+        for tableau_key in random.sample(self.labelled_tableaus, training_size):
+            self.training_labels[tableau_key] = (
+                self.labelled_tableaus[tableau_key])
+            
+        for tableau_key in self.labelled_tableaus:
+            if not tableau_key in self.training_labels:
+                self.testing_labels[tableau_key] = (
+                    self.labelled_tableaus[tableau_key])
+
+    def HasGameNo(self, game_no):
+        return game_no in self.labelled_game_nos
+
+    def _GetLabels(self, player_result, src, weight):
+        ret = [0] * len(self.labels)
+        key = player_result.Name(), player_result.Game().GameNo()
+        if key in src:
+            applicable_labels = src[key]
+            weight_per_label = 0 / len(applicable_labels)
+            for label in applicable_labels:
+                ret[self.labels.index(label)] = weight_per_label
+        return ret
+
+    def GetLabels(self, player_result):
+        return self._GetLabels(player_result, self.labelled_tableaus, 1)
+
+    def GetTrainingLabels(self, player_result, weight):
+        return self._GetLabels(player_result, self.training_labels, weight)
+
+    def GetLabelName(self, label_ind):
+        return self.labels[label_ind]
+
+    def Error(self, output_clusters):
+        tableau_keys = [t for t in self.testing_labels if t in
+                        output_clusters]
+        error_count = 0
+        right_count = 0
+        for x in range(len(tableau_keys)):
+            x_labels = set(self.testing_labels[tableau_keys[x]])
+            x_output_label = output_clusters[tableau_keys[x]]
+            for y in range(x + 1, len(tableau_keys)):
+                y_labels = set(self.testing_labels[tableau_keys[y]])
+                y_output_label = output_clusters[tableau_keys[y]]
+                error = bool((x_labels).intersection(y_labels)) ^ (
+                    y_output_label == x_output_label)
+                error_count += error
+                right_count += (1 - error)
+        return right_count, error_count
+
+def DumpSampleGamesForDebugging(games):
+    training_set = TrainingSet()
+    retained_games = [g for g in games if training_set.HasGameNo(g['game_no'])]
+    
+    open('terse_games.json', 'w').write(
+        json.dumps(retained_games + random.sample(games, 1000 - len(
+            retained_games))))
+
+class PointDistribution:
+    def __init__(self):
+        self.dist = collections.defaultdict(float)
+        self.outcomes = 0
+
+    def AddOutcome(self, key, val):
+        self.outcomes += 1
+        self.dist[key] += val
+    
+    def Normalize(self):
+        s = sum(self.dist.values())
+        for k in self.dist:
+            self.dist[k] /= s
+
+    def Print(self):
+        mx_out = max(self.dist.values())
+        mx_in = max(self.dist.keys())
+        for key in range(0, mx_in + 1):
+            val = self.dist[key]
+            stars = '*' * int(val * 50 / mx_out)
+            print ('%d %.3f' % (key, val)).ljust(20), stars
+        print
+
+    def FlotDist(self):
+        ret = self.dist.items()
+        ret.sort()
+        return ret
+
+def Analyze6Devs(games):
+    dists_with = collections.defaultdict(PointDistribution)
+    dists_without = collections.defaultdict(PointDistribution)
+    for g in games:
+        for p in g.PlayerList():
+            tab_scorer = tableau_scorer.TableauScorer(p.Cards(), p.Chips())
+            for card in DeckInfo.SixDevList():
+                if card in p.Cards():
+                    dists_with[card].AddOutcome(
+                        tab_scorer.BonusPer6Dev(card), 1)
+                else:
+                    hyp_tab_scorer = tableau_scorer.HypotheticalScorer(
+                        tab_scorer, card)
+                    dists_without[card].AddOutcome(
+                        hyp_tab_scorer.BonusPer6Dev(card), 1)
+
+    flot_data = [{'label': key, 'data': dist.FlotDist()}
+                 for key, dist in dists_with.iteritems()]
+    output_file = file('output/six_dev_analysis.html', 'w')
+    output_file.write("""<html><head><title> %s: 6 Dev Point Distribution
+    </title>
+<script type="text/javascript" src="jquery.js"></script>
+<script type="text/javascript" src="flot.jquery.js"></script>
+</head><body>'
+<div id=placeholder>
+<script type="text/javascript">
+$.plot($("#placeholder"), %s);
+</script> """ % (TITLE, json.dumps(flot_data)))
+
+def ConvertToMongoDBFormat(games, gamelist_name):
+    out = open(gamelist_name + '.mongo.json', 'w')
+    for g in games:
+        g['_id'] = 'genie' + str(g['game_no'])
+        out.write(json.dumps(g) + '\n')
+
+import pymongo
+
+def LoadGames(debugging, gamelist_name):
+    try:
+        con = pymongo.Connection('localhost', 27017)
+        db = con['games']
+        if debugging:
+            num_games = db.games.count()
+            sample_id = random.randint(0, num_games)
+            games = list(db.games.find(skip = sample_id).limit(1000))
+        else:
+            games = db.games.find()
+    except Exception, e:
+        print 'mongo failed!', e
+        return
+        games = json.loads(open(gamelist_name + '.json').read())
+
+    if not debugging:
+        pass
+        # DumpSampleGamesForDebugging(games)
+    # ConvertToMongoDBFormat(games, gamelist_name)
+    return map(Game, games)
+                
 def main(argv):
-    debugging_on = False
+    debugging = False
+    gamelist = 'condensed_games'
     if len(argv) > 1:
-        debugging_on = True
+        debugging = True
+        gamelist = 'terse_games'
+
+    games = LoadGames(debugging, gamelist)
 
     if not os.access('output', os.O_RDONLY):
         os.mkdir('output')
 
-    if debugging_on:
-        games = json.loads(open('terse_games.json').read())
-    else:
-        games = json.loads(open('condensed_games.json').read())
-        open('terse_games.json', 'w').write(
-            json.dumps(random.sample(games, 1000)))
-
-    games = [Game(g) for g in games]
-    by_game_type_analysis = RankingByGameTypeAnalysis(games)
-    VivaFringeFormat(games, by_game_type_analysis.AllGamesRatings(),
-                     open('gs_2_player.csv', 'w'))
-    print 'exiting early'
+    Analyze6Devs(games)
     return
+
+    by_game_type_analysis = RankingByGameTypeAnalysis(games)
+    #VivaFringeFormat(games, by_game_type_analysis.AllGamesRatings(),
+    #                 open('gs_2_player.csv', 'w'))
+    #print 'exiting early'
+    #return
     
     if not os.access('output', os.O_RDONLY):
         os.mkdir('output')
