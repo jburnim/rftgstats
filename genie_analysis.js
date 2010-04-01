@@ -41,7 +41,7 @@ function GuardFillText(context) {
 
 
 NOVELTY = 'rgba(0, 192, 255, .6)';
-RARE = 'rgba(120, 60, 00, .6)';
+RARE = 'rgba(120, 60, 0, .6)';
 GENES = 'rgba(75, 255, 0, .6)';
 ALIEN = 'rgba(200, 200, 30, .6)';
 GRAY = 'rgba(75, 75, 75, .6)';
@@ -75,6 +75,16 @@ function cardColor(card) {
 	return ALIEN;
     }
     return GRAY;
+}
+
+function strokeColor(card) {
+    if (card["Military"] == "X"
+      || (card["Type"] == "Development"
+          && (parseInt(card["Strength"]) > 0 || 
+	      card["Name"].indexOf("Imperium") > -1))) {
+    return 'rgba(255, 0, 0, 1.0)';
+  } 
+    return 'rgba(0, 0, 0, 1.0)';
 }
 
 
@@ -237,7 +247,7 @@ function RenderCardWinInfo(data, canvas, wind) {
 	namesByCost.push(name);
     }
     namesByCost.sort(function(nameA, nameB) { 
-	    return parseInt(cardInfo[nameA]['Cost']) < 
+	    return parseInt(cardInfo[nameA]['Cost']) -
 		parseInt(cardInfo[nameB]['Cost']);
 	});
 
@@ -462,14 +472,7 @@ function drawCard(context, x, y, card) {
     context.lineTo(x, y - vert);
   }
 
-  if (card["Military"] == "X"
-      || (card["Type"] == "Development"
-          && (parseInt(card["Strength"]) > 0 || 
-	      card["Name"].indexOf("Imperium") > -1))) {
-    context.strokeStyle = 'rgba(255, 0, 0, 1.0)';
-  } else {
-    context.strokeStyle = 'rgba(0, 0, 0, 1.0)';
-  }
+  context.strokeStyle = strokeColor(card);
 
   context.closePath();
   context.fill();
@@ -488,9 +491,300 @@ function drawCard(context, x, y, card) {
   context.stroke();
 }
 
+function Matrix(elems) {
+    var ret = {};
+    if (elems) {
+	ret.elems = elems;
+	if (elems.length != 3) {
+	    alert("bad first dimension " + elems.length);
+	}
+	for (var i = 0; i < 3; ++i) {
+	    if (elems[i].length != 3) {
+		alert("bad second dimension " + elems[i].length);
+	    }
+	}
+    } else {
+	ret.elems = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    }
+    return ret;
+}
+
+function RotatationMatrix(angle) {
+    var cos_theta = cos(theta);
+    var sin_theta = sin(theta);
+    return Matrix([[cos_theta, -sin_theta, 0],
+		   [sin_theta, cos_theta, 0, 0],
+		   [0, 0, 1]]);
+}
+
+function TranslationMatrix(x, y) {
+    return Matrix([[1, 0, x],
+		   [0, 1, y],
+		   [0, 0, 1]]);
+}
+
+function ScaleMatrix(sx, sy) {
+    return Matrix([[sx, 0, 0],
+		   [0, sy, 0],
+		   [0,  0, 1]]);
+}
+
+function IdentityMatrix() {
+    return Matrix([[1, 0, 0],
+		   [0, 1, 0],
+		   [0, 0, 1]]);
+}
+
+function MatrixMult(a, b) {
+    var ret = Matrix();
+    for (var i = 0; i < 3; ++i) {
+	for (var j = 0; j < 3; ++j) {
+	    for (var k = 0; k < 3; ++k) {
+		ret.elems[i][j] += a.elems[i][k] * b.elems[k][j];
+	    }
+	}
+    }
+    return ret;
+}
+
+function MatrixVecMult(mat, v) {
+    var ret = [0, 0, 0];
+    for (var i = 0; i < 3; ++i) {
+	for (var j = 0; j < 3; ++j) ret[i] += mat.elems[i][j] * v[j];
+    }
+    return ret;
+}
+
+function MyContext(ctx) {
+    var myCtx = {};
+    myCtx.transMat = IdentityMatrix();
+    
+    myCtx.modelToScreen = function(x, y) {
+	var ret = MatrixVecMult(myCtx.transMat, [x, y, 1]);
+	if (ret[0] < 0) ret[0] = 0;
+	if (ret[1] < 0) ret[1] = 0;
+	return ret;
+    }
+
+    myCtx.drawLine = function(x1, y1, x2, y2) {
+	var first = myCtx.modelToScreen(x1, y1);
+	var second = myCtx.modelToScreen(x2, y2);
+	//console.log(x1, y1, first);
+	ctx.beginPath();
+	ctx.moveTo(first[0], first[1]);
+	ctx.lineTo(second[0], second[1]);
+	ctx.stroke();
+	ctx.closePath();
+    }
+    myCtx.fillRect = function(x, y, w, h) {
+	var first = MatrixVecMult(myCtx.transMat, [x, y, 1]);
+	var other_corner = MatrixVecMult(myCtx.transMat, [x + w, y + h, 1]);
+	var new_w = other_corner[0] - first[0];
+	var new_h = other_corner[1] - first[1];
+	ctx.fillRect(first[0], first[1], new_w, new_h);
+    }
+    myCtx.translate = function(x, y) {
+	myCtx.transMat = MatrixMult(myCtx.transMat, TranslationMatrix(x, y));
+    }
+    var fillText = GuardFillText(ctx);
+    myCtx.fillText = function(text, x, y) {
+	var screenCoords = myCtx.modelToScreen(x, y);
+	fillText(text, screenCoords[0], screenCoords[1]);
+    }
+    
+    return myCtx;
+}
+
+function PointDistribution(divId) {
+    var elem = document.getElementById(divId);
+    elem.innerHTML = '<h2>Point score distribution for six cost ' + 
+	'developments</h2>' +
+	'<p>I have collected data about the actual and potential score ' +
+	'of all of the six cost developments in the Gathering Storm from ' +
+	'many completed games on Genie. I did this in hopes of gaining some ' +
+	'insight into the nature of the game, and in particular, ' +
+	'the cost 6 developments ' +
+	'which tend to be the cornerstone of many strategies. '+
+	'<p>The score distribution for each six cost development in the ' +
+	'Gathering Storm is summarized below. Each six cost development has ' +
+	'a pair of whisker plots for the point distribution when the dev ' +
+	'was played, and for how it would have scored on tableaus in which ' +
+	'it was not played.  The distributions are clickable to get the ' +
+	'card name and summary statistics.  The whisker plots contain ' +
+	'a mean ' +
+	'near the 5th, 25th, 50th, 75, and 95th percentile scores. ' +
+	'A table including all of the summary stats is below.' +
+	'<table><tr><td>Point<br>distribution</td>' +
+	'<td><canvas id="pointDistCanvas" height="500" width="1000">' +
+	'</canvas></td></tr>' + 
+	'<tr>' + 
+	'<td></td><td><center>' +
+	'Probability* instance of card appears on tableau<br>' +
+	'<font size=-1>*some bars shifted right to avoid ovedraw</font>' +
+	'</center></td>' + 
+	'</tr></table><div id="pointDistTable">';
+
+    var canvas = document.getElementById("pointDistCanvas");
+    var ctx = canvas.getContext('2d');
+    var myCtx = MyContext(ctx);
+    var maxDesireX = .2;
+    var maxDesireY = 20;
+    var minDesireX = -.01;
+    var minDesireY = -1;
+    
+    var xRange = maxDesireX - minDesireX;
+    var yRange = maxDesireY - minDesireY;
+
+    myCtx.transMat = ScaleMatrix(canvas.width / xRange,
+				 -canvas.height / yRange);
+    myCtx.transMat = MatrixMult(myCtx.transMat, 
+				TranslationMatrix(-minDesireX, -maxDesireY));
+    var whiskerWidth = .001;
+
+    var ret = {}
+    var screenXToCardName = [];
+
+    ret.Render = function(pointData) {
+	var pointDataOrder = [];
+	for (cardName in pointData) {
+	    pointDataOrder[pointDataOrder.length] = cardName;
+	}
+	pointDataOrder.sort(function(x, y) { 
+		return pointData[x].played.prob - pointData[y].played.prob; 
+	    });
+
+	function RenderSingleCardToHtml(cardName) {
+	    function round(v, prec) {
+		if (!prec) {
+		    prec = 4;
+		}
+		var ret = "" + v;
+		return ret.substr(0, prec);
+	    }
+	    var cardData = pointData[cardName];
+	    return '<tr><td>' + cardName + '</td>' + 
+		    '<td>Played</td>' +
+		    '<td>' + round(cardData.played.mean) + '</td>' +
+		    '<td>' + round(cardData.played.stdDev) + '</td>' +
+		    '<td>' + round(cardData.played.prob, 5) + '</td>' + 
+		    '</tr><tr>' + 
+		    '<td></td><td>Unplayed</td>' +
+		    '<td>' + round(cardData.unplayed.mean) + '</td>' +
+		    '<td>' + round(cardData.unplayed.stdDev) + '</td>' +
+		    '</tr>';
+	}
+
+	var summaryTableHeader = '<table border=1><tr>' +
+		'<td>Card Name</td>' +
+		'<td>Played?</td>' +
+		'<td>Mean</td>' + 
+		'<td>Standard<br> Dev</td>' +
+		'<td>Play Prob</td>' + 
+	'</tr>';
+
+	function RenderSummaryDataToTable() {
+	    var dataSummaryHtml = summaryTableHeader;
+	    for (var i = pointDataOrder.length - 1; i >= 0; i--) {
+		dataSummaryHtml += RenderSingleCardToHtml(pointDataOrder[i]);
+	    }
+	    dataSummaryHtml += '</table>';
+	    return dataSummaryHtml;
+	}
+	var pointTableDiv = document.getElementById('pointDistTable');
+	pointTableDiv.innerHTML = RenderSummaryDataToTable();
+
+
+	myCtx.drawLine(0, 0, maxDesireX, 0);
+	myCtx.drawLine(0, 0, 0, maxDesireY);
+	for (var i = 2; i < maxDesireY; i += 2) {
+	    ctx.strokeStyle = "rgba(0, 0, 0, 0.0)";
+	    myCtx.fillText(i, minDesireX/2, i);	 
+	    ctx.strokeStyle = "rgba(210, 210, 210, 1.0)";   
+	    myCtx.drawLine(0, i, maxDesireX, i);	 
+	}
+	for (var i = .02; i < maxDesireX; i += .02) {
+	    var xLabel = ("" + (i + .0001)).substr(0, 4);
+	    var xPos = parseFloat(xLabel);
+	    myCtx.fillText(xLabel, xPos, minDesireY/2);	    
+	}
+
+
+	function RenderBoxPlot(boxPlotData) {
+	    var s = boxPlotData.summary;
+
+	    myCtx.fillRect(-whiskerWidth/2, s[1], whiskerWidth, s[3] - s[1]);
+
+	    myCtx.drawLine(0, s[0], 0, s[1]);
+	    myCtx.drawLine(0, s[3], 0, s[4]);
+
+	    myCtx.drawLine(-whiskerWidth/2, s[1],
+			   -whiskerWidth/2, s[s.length - 2]);
+	    myCtx.drawLine(whiskerWidth/2, s[1],
+			   whiskerWidth/2, s[s.length - 2]);
+
+	    for (var i = 0; i < boxPlotData.summary.length; ++i) {
+		var x1 = -whiskerWidth/2;
+		var x2 = whiskerWidth/2;
+		var y = boxPlotData.summary[i];
+		myCtx.drawLine(x1, y, x2, y);
+	    }
+
+	}
+
+	var lastX = 0;
+	for (var i = 0; i < pointDataOrder.length; ++i) {
+	    var cardName = pointDataOrder[i];
+	    ctx.strokeStyle = strokeColor(cardInfo[cardName]);
+	    ctx.fillStyle = cardColor(cardInfo[cardName]);
+
+	    var curX = pointData[cardName].played.prob;
+	    if (curX < lastX + 3 * whiskerWidth) {
+		curX = lastX + 3 * whiskerWidth;
+	    }
+
+	    myCtx.translate(curX, 0);  // model .save() and .restore()?
+	    RenderBoxPlot(pointData[cardName].played);
+	    screenXToCardName.push([myCtx.modelToScreen(0, 0)[0],
+				    cardName]);
+	    myCtx.translate(-whiskerWidth, 0);
+
+	    RenderBoxPlot(pointData[cardName].unplayed);
+	    myCtx.translate(-curX + whiskerWidth, 0);
+	    lastX = curX;
+	}
+	canvas.onclick = function(event) {
+	    //ret.Render(pointData);
+	    var canvasPos = findPos(canvas);
+	    var absX = (event.clientX + document.body.scrollLeft + 
+			document.documentElement.scrollLeft);
+	    var absY = (event.clientY + document.body.scrollTop + 
+			document.documentElement.scrollTop);
+	    var posX = absX - canvasPos[0];
+	    var posY = absY - canvasPos[1];
+	    minDist = 30;
+	    var cardName = "";
+	    for (var i = 0; i < screenXToCardName.length; ++i) {
+		var curDist = Math.abs(posX - screenXToCardName[i][0]);
+		if (curDist < minDist) {
+		    minDist = curDist;
+		    cardName = screenXToCardName[i][1];
+		}
+	    }
+	    if (minDist < 30) {
+		createPopup(posX + canvasPos[0], posY + canvasPos[1], 
+			    summaryTableHeader + 
+			    RenderSingleCardToHtml(cardName) +
+			    '</table>');
+	    }
+	}
+    };
+    return ret
+};
+
 function createPopup(x, y, text) {
   var popup = document.createElement("div");
-  popup.appendChild(document.createTextNode(text));
+  popup.innerHTML = text;
+  // popup.appendChild(document.createTextNode(text));
   popup.style.position = "absolute";
   popup.style.left = x +"px";
   popup.style.top = y +"px";

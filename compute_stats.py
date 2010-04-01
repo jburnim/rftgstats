@@ -11,6 +11,7 @@ import os
 import simplejson as json
 import shutil
 import sys
+import time
 
 BASE_SKILL = 1500
 MOVEMENT_CONST = 15
@@ -345,6 +346,9 @@ class RandomVariableObserver:
         if self.freq <= 1:
             return 1e10
         return (self.sum_sq - (self.sum ** 2) / self.freq) / (self.freq - 1)
+
+    def StdDev(self):
+        return self.Variance() ** .5
 
     def SampleStdDev(self):
         return (self.Variance() / (self.freq or 1)) ** .5
@@ -1349,62 +1353,68 @@ def DumpSampleGamesForDebugging(games):
         json.dumps(retained_games + random.sample(games, 1000 - len(
             retained_games))))
 
+SAMPLE_INDS = [.05, .25, .5, .75, .95]
+JITTER = [-.03, -.015, 0, .015, .03]
+
 class PointDistribution:
     def __init__(self):
-        self.dist = collections.defaultdict(float)
-        self.outcomes = 0
+        self.point_dist = []
+        self.observer = RandomVariableObserver()
 
-    def AddOutcome(self, key, val):
-        self.outcomes += 1
-        self.dist[key] += val
-    
-    def Normalize(self):
-        s = sum(self.dist.values())
-        for k in self.dist:
-            self.dist[k] /= s
+    def AddOutcome(self, val):
+        self.point_dist.append(val)
+        self.observer.AddOutcome(val)
 
-    def Print(self):
-        mx_out = max(self.dist.values())
-        mx_in = max(self.dist.keys())
-        for key in range(0, mx_in + 1):
-            val = self.dist[key]
-            stars = '*' * int(val * 50 / mx_out)
-            print ('%d %.3f' % (key, val)).ljust(20), stars
-        print
+    def BoxPlotData(self, tableau_ct):
+        summary_stats = []
+        self.point_dist.sort()
+        for ind in SAMPLE_INDS:
+            avg = 0
+            for jitter in JITTER:
+                scaled_ind = int((ind + jitter) * len(self.point_dist))
+                avg += self.point_dist[scaled_ind]
+            summary_stats.append(avg / float(len(JITTER)))
+        return {'prob': float(len(self.point_dist)) / tableau_ct, 
+                'summary': summary_stats,
+                'mean': self.observer.Mean(),
+                'stdDev': self.observer.StdDev()}
 
-    def FlotDist(self):
-        ret = self.dist.items()
-        ret.sort()
-        return ret
 
 def Analyze6Devs(games):
     dists_with = collections.defaultdict(PointDistribution)
     dists_without = collections.defaultdict(PointDistribution)
+    tableau_ct = 0
     for g in games:
         for p in g.PlayerList():
+            tableau_ct += 1
             tab_scorer = tableau_scorer.TableauScorer(p.Cards(), p.Chips())
             for card in DeckInfo.SixDevList():
+                hypo_score = tab_scorer.Hypothetical6DevScore(card)
                 if card in p.Cards():
-                    dists_with[card].AddOutcome(
-                        tab_scorer.BonusPer6Dev(card), 1)
+                    dists_with[card].AddOutcome(hypo_score)
                 else:
-                    hyp_tab_scorer = tableau_scorer.HypotheticalScorer(
-                        tab_scorer, card)
-                    dists_without[card].AddOutcome(
-                        hyp_tab_scorer.BonusPer6Dev(card), 1)
+                    dists_without[card].AddOutcome(hypo_score)
 
-    flot_data = [{'label': key, 'data': dist.FlotDist()}
-                 for key, dist in dists_with.iteritems()]
+    six_dev_summary = {}
+    for card in DeckInfo.SixDevList():
+        six_dev_summary[card] = {
+            'played': dists_with[card].BoxPlotData(tableau_ct),
+            'unplayed': dists_without[card].BoxPlotData(tableau_ct)
+            }    
+
     output_file = file('output/six_dev_analysis.html', 'w')
     output_file.write("""<html><head><title> %s: 6 Dev Point Distribution
-    </title>
-<script type="text/javascript" src="jquery.js"></script>
-<script type="text/javascript" src="flot.jquery.js"></script>
-</head><body>'
-<div id=placeholder>
+    </title>%s %s
+</head><body>
+<div id="point_plot" style="width:1000px;height:600px"></div>
 <script type="text/javascript">
-$.plot($("#placeholder"), %s);
-</script> """ % (TITLE, json.dumps(flot_data)))
+
+var p = PointDistribution("point_plot");
+var six_dev_summary = %s;
+p.Render(six_dev_summary);
+</script>
+</body>
+</html>""" % (TITLE, JS_INCLUDE, CSS, json.dumps(six_dev_summary, indent=2)))
 
 def ConvertToMongoDBFormat(games, gamelist_name):
     out = open(gamelist_name + '.mongo.json', 'w')
@@ -1412,10 +1422,9 @@ def ConvertToMongoDBFormat(games, gamelist_name):
         g['_id'] = 'genie' + str(g['game_no'])
         out.write(json.dumps(g) + '\n')
 
-import pymongo
-
 def LoadGames(debugging, gamelist_name):
     try:
+        import pymongo
         con = pymongo.Connection('localhost', 27017)
         db = con['games']
         if debugging:
@@ -1426,7 +1435,7 @@ def LoadGames(debugging, gamelist_name):
             games = db.games.find()
     except Exception, e:
         print 'mongo failed!', e
-        return
+        print 'failing back to reading from json file'
         games = json.loads(open(gamelist_name + '.json').read())
 
     if not debugging:
@@ -1437,18 +1446,24 @@ def LoadGames(debugging, gamelist_name):
                 
 def main(argv):
     debugging = False
+    t0 = time.time()
     gamelist = 'condensed_games'
     if len(argv) > 1:
         debugging = True
         gamelist = 'terse_games'
 
     games = LoadGames(debugging, gamelist)
+    t1 = time.time()
+    print 'games loaded time', t1 - t0
 
     if not os.access('output', os.O_RDONLY):
         os.mkdir('output')
 
+    CopySupportFilesToOutput(debugging)
     Analyze6Devs(games)
-    return
+    t2 = time.time()
+    print '6 dev stats time', t2 - t1
+
 
     by_game_type_analysis = RankingByGameTypeAnalysis(games)
     #VivaFringeFormat(games, by_game_type_analysis.AllGamesRatings(),
@@ -1464,7 +1479,9 @@ def main(argv):
 
     for player, player_games in PlayerToGameList(games).iteritems():
         RenderPlayerPage(player, player_games, by_game_type_analysis)
-    CopySupportFilesToOutput(debugging_on)
+    
 
 if __name__ == '__main__':
     main(sys.argv)
+    #import profile
+    #profile.run('main(sys.argv)')

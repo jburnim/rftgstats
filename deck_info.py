@@ -41,6 +41,10 @@ class DeckInfo:
         return DeckInfo.six_dev_list
 
     @staticmethod
+    def CardList():
+        return DeckInfo.card_info_dict.keys()
+
+    @staticmethod
     def CardFrequencyInDeck(card_name):
         card = DeckInfo.card_info_dict[card_name]
         if card['Name'] == 'Contact Specialist':

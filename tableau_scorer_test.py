@@ -26,6 +26,9 @@ class TestTableauScorer(unittest.TestCase):
         self.assertEquals(9, t.BonusPer6Dev('Alien Tech Institute'))
         self.assertEquals(9, t.PointsPerCard('Alien Tech Institute'))
         self.assertEquals(5, t.PointsPerCard('Damaged Alien Factory'))
+        self.assertEquals(9, t.Hypothetical6DevScore('Alien Tech Institute'))
+        self.assertEquals(2, t.Hypothetical6DevScore('Galactic Imperium'))
+        self.assertEquals(5, t.Hypothetical6DevScore('Galactic Survey SETI'))
 
     def testGalacticFederation(self):
         t = tableau_scorer.TableauScorer(['Galactic Federation',
