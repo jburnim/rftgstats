@@ -41,7 +41,9 @@ CSS = '<link rel="stylesheet" type="text/css" href="style.css" />'
 
 INTRO_BLURB = """<h2>Introduction</h2>
 <p>Hi, welcome to Race for the Galaxy
-statistics page by rrenaud, Danny, and Aragos.
+statistics page by <a href="player_rrenaud.html">rrenaud</a>, 
+<a href="player_Danny.html">Danny</a>, and 
+<a href="player_Aragos.html">Aragos</a>.
 All of the data here is collected from the wonderful
 <a href="http://genie.game-host.org">Genie online Race for the Galaxy server
 </a>.  The code that computes this information is open source and available
@@ -51,6 +53,15 @@ project</a>.  These stats look best when viewed with a recent version of
 href="http://www.google.com/chrome">Chrome</a>.  The raw data from genie is
 available <a href="condensed_games.json">here</a>. Contributions
 welcome!</p>
+
+<h3>Sub-analysis</h3>
+<p>Here is a graph of the number of points each <a href="six_dev_analysis.html">
+six cost development scores</a> when it both when a 6 dev is played and when 
+not played.
+
+<p>Here are two neat animated graphs of the winning rate/play rate as 
+a function of <a href="game_size.html">the number of players</a> and the 
+<a href="goals_vs_nongoals.html">inclusion of goals</a>.
 
 <h3>A brief discussion about <i>Winning Rates</i></h3>
 <p>
@@ -62,12 +73,27 @@ Thus, a totally average and optimally balanced homeworld will have a
 winning rate of near 1 after many games.  Likewise, a player whose skill
 is totally representative of the distribution of the player population will
 have a winning rate of 1.
+
+<h3><i>Skill Normalized</i> win rates</h3>
+<p>One problem with win rates is that they do not scale well with player skill.
+Therefore, I compute a prior probability to win the game for each player based
+on the player ratings before the start of a game.  Consider a hypothetical game
+between players rrenaud, fairgr, and kingcong.  Assume that rating system
+predicts that the players will win with .3, .5, and .2 respectively.  Then if
+fairgr wins, he (or specifically in the winning rate graph, the cards he played)
+will be awarded 3 points, and will be expected to win 1.5 points.  If rrenaud
+wins, the cards he played will be awarded 3 points, and expected to win 
+.9 points.  If kingcong wins, her cards wil be awarded 3 points, and are 
+expected to win .6 points.  I call the the total awarded poins divided by 
+the expected number of points the <i>Skill normalized</i> win rate, and it
+is what is plotted in the card graph below.
 """
 
 WINNING_RATE_VS_PLAY_RATE_DESCRIPTION = """<p>
-<h2>Card winning rate vs play rate</h2>
+<h2>Skill normalized card winning rate vs play rate</h2>
 <p>This graph shows data by analyzing end game tableaus. </p>
-<p>Strong cards have high winning rates and tend to be played more often.  
+<p>Strong cards have high skill normalized winning rates and 
+tend to be played more often.  
 You can click on a card's icon to see its name.</p>
 <p>Cards played as homeworlds are excluded from the data, so that they don't
 totally skew the play rate.  All the analyzed games are using the Gathering 
@@ -854,7 +880,7 @@ def PlayerLink(player_name):
 def RenderCardWinGraph(out_file, card_win_info):
     out_file.write("""
 <p>
-<table><tr><td>Winning Rate</td>
+<table><tr><td>Skill Normalized<br>Winning Rate</td>
    <td><canvas id="cardWinInfoCanvas" height="600" width="800"></canvas></td>
 </tr>
 <tr>
@@ -906,9 +932,11 @@ def AdjustedWinPoints(cardWinInfo):
         print per_card_info[0].ljust(25), ('%.3f' % per_card_info[1]['norm_win_points_per_game']).ljust(20), per_card_info[1]['norm_win_points']
     
 
+def GatheringStormGames(games):
+    return [g for g in games if g.Expansion() == 1]
+
 def NonTiedGatheringStormGames(games):
-    return FilterOutTies(
-        [g for g in games if g.Expansion() == 1])
+    return FilterOutTies(GatheringStormGames(games))
     
 def RenderGoalVsNonGoalPage(games, rankings_by_game_type):
     overview = OverviewStats(games)
@@ -1384,7 +1412,7 @@ def Analyze6Devs(games):
     dists_with = collections.defaultdict(PointDistribution)
     dists_without = collections.defaultdict(PointDistribution)
     tableau_ct = 0
-    for g in games:
+    for g in GatheringStormGames(games):
         for p in g.PlayerList():
             tableau_ct += 1
             tab_scorer = tableau_scorer.TableauScorer(p.Cards(), p.Chips())
@@ -1463,7 +1491,6 @@ def main(argv):
     Analyze6Devs(games)
     t2 = time.time()
     print '6 dev stats time', t2 - t1
-
 
     by_game_type_analysis = RankingByGameTypeAnalysis(games)
     #VivaFringeFormat(games, by_game_type_analysis.AllGamesRatings(),

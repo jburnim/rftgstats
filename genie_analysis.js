@@ -492,9 +492,9 @@ function drawCard(context, x, y, card) {
 }
 
 function Matrix(elems) {
-    var ret = {};
+    var self = {};
     if (elems) {
-	ret.elems = elems;
+	self.elems = elems;
 	if (elems.length != 3) {
 	    alert("bad first dimension " + elems.length);
 	}
@@ -504,9 +504,19 @@ function Matrix(elems) {
 	    }
 	}
     } else {
-	ret.elems = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+	self.elems = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
     }
-    return ret;
+    self.Copy = function() {
+	var cpElems = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+	for (var i = 0; i < 3; ++i) {
+	    for (var j = 0; j < 3; ++j) {
+		cpElems[i][j] = self.elems[i][j];
+	    }
+	}
+	return Matrix(cpElems);
+    }
+
+    return self;
 }
 
 function RotatationMatrix(angle) {
@@ -557,10 +567,22 @@ function MatrixVecMult(mat, v) {
 
 function MyContext(ctx) {
     var myCtx = {};
-    myCtx.transMat = IdentityMatrix();
+    myCtx.modelMats = [IdentityMatrix()];
     
+    myCtx.curModelMat = function() {
+	return myCtx.modelMats[myCtx.modelMats.length - 1];
+    }
+
+    myCtx.save = function() {
+	myCtx.modelMats.push(myCtx.curModelMat().Copy());
+    };
+
+    myCtx.restore = function() {
+	myCtx.modelMats.pop();
+    }
+
     myCtx.modelToScreen = function(x, y) {
-	var ret = MatrixVecMult(myCtx.transMat, [x, y, 1]);
+	var ret = MatrixVecMult(myCtx.curModelMat(), [x, y, 1]);
 	if (ret[0] < 0) ret[0] = 0;
 	if (ret[1] < 0) ret[1] = 0;
 	return ret;
@@ -569,7 +591,6 @@ function MyContext(ctx) {
     myCtx.drawLine = function(x1, y1, x2, y2) {
 	var first = myCtx.modelToScreen(x1, y1);
 	var second = myCtx.modelToScreen(x2, y2);
-	//console.log(x1, y1, first);
 	ctx.beginPath();
 	ctx.moveTo(first[0], first[1]);
 	ctx.lineTo(second[0], second[1]);
@@ -577,15 +598,22 @@ function MyContext(ctx) {
 	ctx.closePath();
     }
     myCtx.fillRect = function(x, y, w, h) {
-	var first = MatrixVecMult(myCtx.transMat, [x, y, 1]);
-	var other_corner = MatrixVecMult(myCtx.transMat, [x + w, y + h, 1]);
+	var first = MatrixVecMult(myCtx.curModelMat(), [x, y, 1]);
+	var other_corner = MatrixVecMult(myCtx.curModelMat(), 
+					 [x + w, y + h, 1]);
 	var new_w = other_corner[0] - first[0];
 	var new_h = other_corner[1] - first[1];
 	ctx.fillRect(first[0], first[1], new_w, new_h);
     }
     myCtx.translate = function(x, y) {
-	myCtx.transMat = MatrixMult(myCtx.transMat, TranslationMatrix(x, y));
+	var nextMat = MatrixMult(myCtx.curModelMat(), TranslationMatrix(x, y));
+	myCtx.modelMats[myCtx.modelMats.length - 1] = nextMat;
     }
+    myCtx.scale = function(x, y) {
+	var nextMat = MatrixMult(myCtx.curModelMat(), ScaleMatrix(x, y));
+	myCtx.modelMats[myCtx.modelMats.length - 1] = nextMat;
+    }
+
     var fillText = GuardFillText(ctx);
     myCtx.fillText = function(text, x, y) {
 	var screenCoords = myCtx.modelToScreen(x, y);
@@ -613,14 +641,18 @@ function PointDistribution(divId) {
 	'card name and summary statistics.  The whisker plots contain ' +
 	'a mean ' +
 	'near the 5th, 25th, 50th, 75, and 95th percentile scores. ' +
-	'A table including all of the summary stats is below.' +
+	'A table including all of the summary stats is below.<br>' +
+	'<p>Thanks to Edward Fu (<a href="player_theory.html">theory</a>), ' +
+	'Alex Chen (<a href="player_vivafringe.html">vivafringe</a>), and ' +
+	'Larry Mak (<a href="player_Larry.html">Larry</a>) ' +
+	'for inspiration, ideas, and refinements to this page.' +
 	'<table><tr><td>Point<br>distribution</td>' +
 	'<td><canvas id="pointDistCanvas" height="500" width="1000">' +
 	'</canvas></td></tr>' + 
 	'<tr>' + 
 	'<td></td><td><center>' +
 	'Probability* instance of card appears on tableau<br>' +
-	'<font size=-1>*some bars shifted right to avoid ovedraw</font>' +
+	'<font size=-1>*some bars shifted right to avoid overdraw</font>' +
 	'</center></td>' + 
 	'</tr></table><div id="pointDistTable">';
 
@@ -635,11 +667,10 @@ function PointDistribution(divId) {
     var xRange = maxDesireX - minDesireX;
     var yRange = maxDesireY - minDesireY;
 
-    myCtx.transMat = ScaleMatrix(canvas.width / xRange,
-				 -canvas.height / yRange);
-    myCtx.transMat = MatrixMult(myCtx.transMat, 
-				TranslationMatrix(-minDesireX, -maxDesireY));
-    var whiskerWidth = .001;
+    myCtx.scale(canvas.width / xRange, -canvas.height / yRange);
+    myCtx.translate(-minDesireX, -maxDesireY);
+
+    var whiskerWidth = .0015;
 
     var ret = {}
     var screenXToCardName = [];
@@ -663,22 +694,18 @@ function PointDistribution(divId) {
 	    }
 	    var cardData = pointData[cardName];
 	    return '<tr><td>' + cardName + '</td>' + 
-		    '<td>Played</td>' +
-		    '<td>' + round(cardData.played.mean) + '</td>' +
-		    '<td>' + round(cardData.played.stdDev) + '</td>' +
-		    '<td>' + round(cardData.played.prob, 5) + '</td>' + 
-		    '</tr><tr>' + 
-		    '<td></td><td>Unplayed</td>' +
-		    '<td>' + round(cardData.unplayed.mean) + '</td>' +
-		    '<td>' + round(cardData.unplayed.stdDev) + '</td>' +
+		    '<td>' + round(cardData.played.mean) + ' +- ' +
+		    round(cardData.played.stdDev * 2) + '</td>' +
+		    '<td>' + round(cardData.unplayed.mean) + ' +- ' +
+		    round(cardData.unplayed.stdDev * 2) + '</td>' +
+		    '<td>' + round(cardData.played.prob, 5) + '</td>' +
 		    '</tr>';
 	}
 
 	var summaryTableHeader = '<table border=1><tr>' +
 		'<td>Card Name</td>' +
-		'<td>Played?</td>' +
-		'<td>Mean</td>' + 
-		'<td>Standard<br> Dev</td>' +
+		'<td>Played Mean +- 2 Std Dev</td>' +
+	        '<td>Unplayed Mean +- 2 Std Dev</td>' +
 		'<td>Play Prob</td>' + 
 	'</tr>';
 
@@ -708,27 +735,27 @@ function PointDistribution(divId) {
 	    myCtx.fillText(xLabel, xPos, minDesireY/2);	    
 	}
 
-
 	function RenderBoxPlot(boxPlotData) {
 	    var s = boxPlotData.summary;
 
-	    myCtx.fillRect(-whiskerWidth/2, s[1], whiskerWidth, s[3] - s[1]);
+	    myCtx.fillRect(0, s[1], whiskerWidth/2, s[3] - s[1]);
 
 	    myCtx.drawLine(0, s[0], 0, s[1]);
 	    myCtx.drawLine(0, s[3], 0, s[4]);
 
-	    myCtx.drawLine(-whiskerWidth/2, s[1],
-			   -whiskerWidth/2, s[s.length - 2]);
-	    myCtx.drawLine(whiskerWidth/2, s[1],
-			   whiskerWidth/2, s[s.length - 2]);
+	    myCtx.drawLine(0, s[1], 0, s[s.length - 2]);
+	    myCtx.drawLine(whiskerWidth/2, s[1], whiskerWidth/2, 
+			   s[s.length - 2]);
 
 	    for (var i = 0; i < boxPlotData.summary.length; ++i) {
-		var x1 = -whiskerWidth/2;
-		var x2 = whiskerWidth/2;
+		var x1 = 0;
+		var x2 = whiskerWidth;
+		if (0 < i && i < 4) {
+		    x2 /= 2;
+		}
 		var y = boxPlotData.summary[i];
 		myCtx.drawLine(x1, y, x2, y);
 	    }
-
 	}
 
 	var lastX = 0;
@@ -741,15 +768,14 @@ function PointDistribution(divId) {
 	    if (curX < lastX + 3 * whiskerWidth) {
 		curX = lastX + 3 * whiskerWidth;
 	    }
-
-	    myCtx.translate(curX, 0);  // model .save() and .restore()?
+	    myCtx.save();
+	    myCtx.translate(curX, 0);
 	    RenderBoxPlot(pointData[cardName].played);
 	    screenXToCardName.push([myCtx.modelToScreen(0, 0)[0],
 				    cardName]);
-	    myCtx.translate(-whiskerWidth, 0);
-
+	    myCtx.scale(-1, 1);
 	    RenderBoxPlot(pointData[cardName].unplayed);
-	    myCtx.translate(-curX + whiskerWidth, 0);
+	    myCtx.restore();
 	    lastX = curX;
 	}
 	canvas.onclick = function(event) {
