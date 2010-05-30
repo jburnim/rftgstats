@@ -151,7 +151,7 @@ def main():
     games = []
     error_sources = []
     known_errors = []
-    data_sources = os.listdir('data')
+    data_sources = [x for x in os.listdir('data') if not 'xml' in x]
     for game_data_fn in data_sources:
         write_dead = False
         try:
@@ -170,11 +170,12 @@ def main():
         except CompleteButRejectedGame:
             print 'Rejecting', game_data_fn
             write_dead = True
+        except Exception, e:
+            error_sources.append(game_data_fn)
+            print 'error', e, game_data_fn
         if write_dead:
             open(full_game_fn + '.dead', 'w')
-        #except Exception, e:
-        #    error_sources.append(game_data_fn)
-        #    print 'error', e, game_data_fn
+
 
     print 'games with errors', error_sources
     print 'games with known errors', known_errors

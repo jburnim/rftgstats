@@ -51,7 +51,7 @@ at <a href="http://code.google.com/p/rftgstats">the rftgstats google code
 project</a>.  These stats look best when viewed with a recent version of 
 <a href="http://mozilla.org">Firefox 3</a> or <a
 href="http://www.google.com/chrome">Chrome</a>.  The raw data from genie is
-available <a href="condensed_games.json">here</a>. Contributions
+available <a href="condensed_games.json.gz">here</a>. Contributions
 welcome!</p>
 
 <h3>Sub-analysis</h3>
@@ -1225,7 +1225,7 @@ def CopySupportFilesToOutput(debugging_on):
     CopyOrLink('card_attrs.js', debugging_on)
     CopyOrLink('genie_analysis.js', debugging_on)
     CopyOrLink('style.css', debugging_on)
-    CopyOrLink('condensed_games.json', debugging_on)
+    CopyOrLink('condensed_games.json.gz', debugging_on)
     
     if not os.access('output/flot', os.O_RDONLY):
         shutil.copytree('flot', 'output/flot')
@@ -1452,7 +1452,7 @@ def ConvertToMongoDBFormat(games, gamelist_name):
 
 def LoadGames(debugging, gamelist_name):
     try:
-        import pymongo
+        #import pymongo
         con = pymongo.Connection('localhost', 27017)
         db = con['games']
         if debugging:
