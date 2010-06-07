@@ -2,35 +2,47 @@
 
 import collections
 
-from deck_info import DeckInfo, HOMEWORLDS, GOOD_TYPES, PROD_TYPES
+from deck_info import DeckInfo, RVI_HOMEWORLDS, GOOD_TYPES, PROD_TYPES, EXPANSIONS, BaseDeckInfo, GSDeckInfo, DISCARDABLE_CARDS
 import tableau_scorer
 import math
 import pprint
 import random
+import re
 import os
 import simplejson as json
 import shutil
 import sys
 import time
 
+EXP_ABBREV = ['base', 'tgs', 'rvi']
+
 BASE_SKILL = 1500
 MOVEMENT_CONST = 15
 
-GOALS = [
-    '4+ Production',
-    '4+ Devs',
-    '6+ Military',
-    '3+ Blue/Brown',
-    '5 VP',
-    'First 6 Dev',
-    'All Abilities',
-    'First Discard',
-    'All Colors',
-    '3 Aliens',
+GS_GOALS = [
+    'Most Prod worlds',
+    'Most Developments',
+    'Most Military',
+    'Most Rares or Novelties',
+    'First 5 vps',
+    'First 6 pt dev',
+    'First all phase powers',
+    'First discard',
+    'First all worlds',
+    'First 3 aliens',
     ]
 
+RVI_GOALS = GS_GOALS + [
+    'Most Explore Powers',
+    'Most Rebel Military Worlds',
+    'First 4 Prod goods',
+    'First 3 Uplift',
+    'First 8 Tableau'
+]
+
+MATCH_TRAILING_DIGITS = re.compile('(\d+)$')
+
 # move to deck info
-DISCARDABLE_CARDS = ['Doomed World', 'Colony Ship', 'New Military Tactics']
 
 TITLE = 'RFTGStats.com: Race for the Galaxy Statistics'
 JS_INCLUDE = (
@@ -46,24 +58,30 @@ statistics page by <a href="player_rrenaud.html">rrenaud</a>,
 <a href="player_Aragos.html">Aragos</a>.
 All of the data here is collected from the wonderful
 <a href="http://genie.game-host.org">Genie online Race for the Galaxy server
-</a>.  The code that computes this information is open source and available
+</a> or the <a href="http://flexboardgames.com/Rftg.html">Flexboardgames Race
+for the Galaxy server</a>.  The code that computes this information is 
+open source and available
 at <a href="http://code.google.com/p/rftgstats">the rftgstats google code
 project</a>.  These stats look best when viewed with a recent version of 
 <a href="http://mozilla.org">Firefox 3</a> or <a
 href="http://www.google.com/chrome">Chrome</a>.  The raw data from genie is
-available <a href="condensed_games.json.gz">here</a>. Contributions
-welcome!</p>
+available <a href="condensed_games.json.gz">here</a>. The raw data from flex is
+available <a href="condensed_flex.json.gz">here</a>. Contributions
+welcome!</p>"""
 
-<h3>Sub-analysis</h3>
+SIX_DEV_BLURB = """<h3>Sub-analysis</h3>
 <p>Here is a graph of the number of points each <a href="six_dev_analysis.html">
 six cost development scores</a> when it both when a 6 dev is played and when 
-not played.
+not played."""
 
-<p>Here are two neat animated graphs of the winning rate/play rate as 
-a function of <a href="game_size.html">the number of players</a> and the 
-<a href="goals_vs_nongoals.html">inclusion of goals</a>.
+CARDS_GAME_SIZE = """<p>Here is an animated graph of the winning 
+rate/play rate as a function of <a href="game_size.html">the number of 
+players</a>."""
 
-<h3>A brief discussion about <i>Winning Rates</i></h3>
+CARDS_GOALS = """<p>Here is an animated graph on the win rate play/rate as 
+a function of the <a href="goals_vs_nongoals.html">inclusion of goals</a>."""
+
+WINNING_RATES_BLURB = """<h3>A brief discussion about <i>Winning Rates</i></h3>
 <p>
 An <i>n</i> player game is worth <i>n</i> points.  The wining rate is the
 number of points accumulated divided by the number of games played.
@@ -86,8 +104,7 @@ wins, the cards he played will be awarded 3 points, and expected to win
 .9 points.  If kingcong wins, her cards wil be awarded 3 points, and are 
 expected to win .6 points.  I call the the total awarded poins divided by 
 the expected number of points the <i>Skill normalized</i> win rate, and it
-is what is plotted in the card graph below.
-"""
+is what is plotted in the card graph below."""
 
 WINNING_RATE_VS_PLAY_RATE_DESCRIPTION = """<p>
 <h2>Skill normalized card winning rate vs play rate</h2>
@@ -96,8 +113,7 @@ WINNING_RATE_VS_PLAY_RATE_DESCRIPTION = """<p>
 tend to be played more often.  
 You can click on a card's icon to see its name.</p>
 <p>Cards played as homeworlds are excluded from the data, so that they don't
-totally skew the play rate.  All the analyzed games are using the Gathering 
-Storm expansion so the play rate distribution is fair.</p>
+totally skew the play rate.
 <p>The absolute play rate is divided by the number of instances of the card
 in the deck, so investment credits is divided by 2, and contact specialist
 is divided by 3.  By doing so, cheap developments do not dominate the play
@@ -134,19 +150,43 @@ start time),
 rather than game end time, as Genie does.  Since there are some players who game
 the Genie system, I suspect this method may be slightly more accurate simply
 because players do not have much of an incentive to game it.</li>
+<li>This includes games from flex, which are currently all assumed to occur
+after the last game on genie.</li>
 </ul>
 """
 
 def GoalVector(goals):
-    ret = [0] * len(GOALS)
+    ret = [0] * len(GS_GOALS)
     for goal in goals:
-        ret[GOALS.index(goal)] = 1
+        ret[GS_GOALS.index(goal)] = 1
     return ret
 
 def GetAndRemove(dict, key):
     ret = dict[key]
     del dict[key]
     return ret
+
+class FixedExpansionGameSet:
+    def __init__(self, games, exp_ver):
+        self.games = [g for g in games if g.Expansion() == exp_ver]
+        self.exp_ver = exp_ver
+        self.exp_name = EXPANSIONS[exp_ver]
+
+        self.goals = []
+        self.deck = BaseDeckInfo
+        if exp_ver == 1:
+            self.goals = GS_GOALS
+            self.deck = GSDeckInfo
+        elif exp_ver == 2:
+            self.goals = RVI_GOALS
+            self.deck = DeckInfo
+
+    def Goals(self):
+        return self.goals
+
+    def Deck(self):
+        return self.deck
+
 
 class Game:
     def __init__(self, game_dict):
@@ -167,7 +207,7 @@ class Game:
         if 'goals' in game_dict:
             self.goals = GetAndRemove(game_dict, 'goals')
 
-        self.game_no = GetAndRemove(game_dict, 'game_no')
+        self.game_id = GetAndRemove(game_dict, 'game_id')
         self.expansion = GetAndRemove(game_dict, 'expansion')
         self.advanced = GetAndRemove(game_dict, 'advanced')
 
@@ -177,7 +217,7 @@ class Game:
     def __str__(self):
         player_info_string = '\t' + '\n\t'.join(
             str(p) for p in self.PlayerList())
-        return '%d %s\n' % (self.GameNo(), player_info_string)
+        return '%s %s\n' % (self.GameId(), player_info_string)
 
     def WinningScore(self):
         return max(result.Score() for result in self.PlayerList())
@@ -192,8 +232,11 @@ class Game:
     def PlayerList(self):
         return self.player_list
 
+    def GameId(self):
+        return self.game_id
+
     def GameNo(self):
-        return self.game_no
+        return int(MATCH_TRAILING_DIGITS.search(self.game_id).group(1))
 
     def Goals(self):
         return self.goals
@@ -225,7 +268,7 @@ class PlayerResult:
         # This misclassifes initial doomed world settles that are
         # other homeworlds.  I doubt that happens all that often
         # though.
-        if self.cards[0] in HOMEWORLDS:
+        if self.cards[0] in RVI_HOMEWORLDS:
             self.homeworld = self.cards[0]
         else:
             self.homeworld = 'Doomed World'
@@ -270,9 +313,9 @@ class PlayerResult:
         return self.cards
 
     def GoalVector(self, weight = 1):
-        ret = [0] * len(GOALS)
+        ret = [0] * len(GS_GOALS)
         for goal in self.goals:
-            ret[GOALS.index(goal)] = weight
+            ret[GS_GOALS.index(goal)] = weight
         return ret
 
     def __str__(self):
@@ -342,7 +385,7 @@ class PlayerResult:
     def AlexFeatureVector(self):
         return self.CardVector(record_places=True) + \
             self.Game().GoalVector() + self.FeatureSummary() + [
-            self.Name(), self.Game().GameNo()]
+            self.Name(), self.Game().GameId()]
 
     def FullFeatureVector(self):
         return self.CardVector(record_places=False) + self.FeatureSummary()
@@ -391,11 +434,11 @@ def ComputeStatsByBucketFromPlayerResults(player_results,
 
     for player_result in player_results:
         game = player_result.Game()
-        game_no = game.GameNo()
+        game_id = game.GameId()
         n = float(len(game.PlayerList()))
         player_name = player_result.Name()
         if rating_system:
-            won_prob = rating_system.ProbWonAtGameNo(game_no, player_name)
+            won_prob = rating_system.ProbWonAtGameId(game_id, player_name)
         else:
             won_prob = 1.0 / n
 
@@ -530,18 +573,18 @@ class SkillRatings:
             lambda: collections.defaultdict(int))
         self.model_log_loss = 0.0
         self.winner_pred_log_loss = 0.0
-        self.ratings_at_game_no = collections.defaultdict(dict)
-        self.prob_won_at_game_no = collections.defaultdict(dict)
+        self.ratings_at_game_id = collections.defaultdict(dict)
+        self.prob_won_at_game_id = collections.defaultdict(dict)
 
         for game in FilterOutTies(games):
             winner = game.GameWinners()[0]
             win_name = winner.Name()
             losers = []
-            game_no = game.GameNo()
+            game_id = game.GameId()
             for player in game.PlayerList():
                 player_name = player.Name()
                 rating = self.GetSkillInfo(player_name).rating
-                self.ratings_at_game_no[game_no][player_name] = rating
+                self.ratings_at_game_id[game_id][player_name] = rating
                 if player_name == win_name:
                     continue
                 loser_name = player.Name()
@@ -556,7 +599,7 @@ class SkillRatings:
                 player_names)
             name_prob_pairs = [(player_name, win_prob) for player_name, win_prob
                                in zip(player_names, multiplayer_win_probs)]
-            self.prob_won_at_game_no[game_no] = name_prob_pairs
+            self.prob_won_at_game_id[game_id] = name_prob_pairs
             pred = multiplayer_win_probs[winner_idx]
             self.winner_pred_log_loss += math.log(pred) / math.log(2)
 
@@ -586,11 +629,11 @@ class SkillRatings:
             self.ranking_percentile[name] = 100.0 * (1.0 - (
                 float(idx) / len(self.sorted_by_skill)))
 
-    def RatingAtGameNo(self, game_no, player_name):
-        return self.ratings_at_game_no[game_no][player_name]
+    def RatingAtGameId(self, game_id, player_name):
+        return self.ratings_at_game_id[game_id][player_name]
 
-    def ProbWonAtGameNo(self, game_no, player_name):
-        name_probs = self.prob_won_at_game_no[game_no]
+    def ProbWonAtGameId(self, game_id, player_name):
+        name_probs = self.prob_won_at_game_id[game_id]
         for name, prob in name_probs:
             if player_name == name:
                 return prob
@@ -662,14 +705,18 @@ class BucketInfo:
                  norm_win_points, norm_win_points_ssd, frequency):
         self.key = key
         self.win_points = win_points
-        self.win_points_ssd = win_points_ssd
+        self.win_points_ssd = max(win_points_ssd, 0)
         self.frequency = frequency
         self.norm_win_points = norm_win_points
         self.norm_win_points_ssd = norm_win_points_ssd
+
+    def __str__(self):
+        return '%s,win points:%f,freq: %f,ssd: %f' % (
+            str(self.key), self.win_points, self.frequency, self.win_points_ssd)
         
 # this has the overly non-general assumption that the card is the key, rather
 # than simply a part of the key
-def ComputeByCardStats(player_results, card_yielder, skill_ratings):
+def ComputeByCardStats(player_results, card_yielder, skill_ratings, gameset):
     bucketted_stats = ComputeStatsByBucketFromPlayerResults(
         player_results, card_yielder, skill_ratings)
     
@@ -679,8 +726,9 @@ def ComputeByCardStats(player_results, card_yielder, skill_ratings):
         card = bucket_info.key
         prob_per_card_name = bucket_info.frequency / total_tableaus
         prob_per_card_name_var = prob_per_card_name * (1 - prob_per_card_name)
-        prob_per_card_name_ssd = (prob_per_card_name_var / total_tableaus) ** .5
-        freq_in_deck = DeckInfo.CardFrequencyInDeck(card)
+        scaled_var = prob_per_card_name_var / total_tableaus
+        prob_per_card_name_ssd = scaled_var ** .5
+        freq_in_deck = DeckInfo.CardFrequencyInDeck(card, gameset.exp_ver)
         prob_per_card = prob_per_card_name / freq_in_deck
         prob_per_card_ssd = prob_per_card_name_ssd / freq_in_deck
         grouped_by_card[card] = {
@@ -693,16 +741,16 @@ def ComputeByCardStats(player_results, card_yielder, skill_ratings):
     return grouped_by_card
     
 
-def ComputeWinningStatsByCardPlayed(player_results, skill_ratings):
+def ComputeWinningStatsByCardPlayed(player_results, skill_ratings, gameset):
     def NonHomeworldCardYielder(player_result, game):
         for idx, card in enumerate(player_result.Cards()):
-            if not (idx == 0 and card in HOMEWORLDS or
+            if not (idx == 0 and card in RVI_HOMEWORLDS or
                     card == 'Gambling World'):
                 yield card
     return FilterDiscardables(ComputeByCardStats(
-            player_results, NonHomeworldCardYielder, skill_ratings))
+            player_results, NonHomeworldCardYielder, skill_ratings, gameset))
 
-def GoalInfluenceOnCardStats(player_results, skill_ratings):
+def GoalInfluenceOnCardStats(player_results, skill_ratings, gameset):
     with_goals, without_goals = [], []
     for player_result in player_results:
         if player_result.Game().GoalGame():
@@ -711,19 +759,22 @@ def GoalInfluenceOnCardStats(player_results, skill_ratings):
             without_goals.append(player_result)
     return [
         {'title': 'Without goals',
-         'data': ComputeWinningStatsByCardPlayed(without_goals, skill_ratings)},
+         'data': ComputeWinningStatsByCardPlayed(without_goals, 
+                                                 skill_ratings, gameset)},
         {'title': 'With goals',
-         'data': ComputeWinningStatsByCardPlayed(with_goals, skill_ratings)}
+         'data': ComputeWinningStatsByCardPlayed(with_goals, 
+                                                 skill_ratings, gameset)}
         ]
 
-def GameSizeInfluenceOnCardStats(player_results, ratings):
+def GameSizeInfluenceOnCardStats(player_results, ratings, gameset):
     games_by_size = collections.defaultdict(list)
     for player_result in player_results:
         game_size = len(player_result.Game().PlayerList())
         games_by_size[game_size].append(player_result)
     return [
         {'title': 'Game Size %d' % size,
-         'data': ComputeWinningStatsByCardPlayed(games_by_size[size], ratings)}
+         'data': ComputeWinningStatsByCardPlayed(games_by_size[size], 
+                                                 ratings, gameset)}
         for size in sorted(games_by_size.keys())
         ]
 
@@ -731,7 +782,8 @@ def FilterOutNonGoals(games):
     return [g for g in games if g.GoalGame()]
 
 class HomeworldGoalAnalysis:
-    def __init__(self, games):
+    def __init__(self, games, gameset):
+        self.gameset = gameset
         games = FilterOutNonGoals(games)
         def HomeworldGoalYielder(player_result, game):
             for goal in game.Goals():
@@ -745,17 +797,20 @@ class HomeworldGoalAnalysis:
         self.bucketted_by_homeworld = ComputeWinningStatsByHomeworld(games)
 
     def RenderStatsAsHtml(self):
-        html = '<table border=1><tr><td>Homeworld</td><td>'
-        html += 'Baseline Winning Rate</td>'
-        for goal in GOALS:
+        html = '<table border=1><tr><td>Homeworld</td>'
+        html += '<td>Baseline Winning Rate</td>'
+        html += '<td>Frequency</td>'
+        for goal in self.gameset.Goals():
             html += '<td>%s</td>' % goal
         html += '</tr>\n'
 
         for bucket_info in self.bucketted_by_homeworld:
             homeworld = bucket_info.key
             win_points = bucket_info.win_points
-            html += '<tr><td>%s</td><td>%.3f</td>' % (homeworld, win_points)
-            for goal in GOALS:
+            freq = bucket_info.frequency
+            html += '<tr><td>%s</td><td>%.3f</td><td>%d</td>' % (
+                homeworld, win_points, freq)
+            for goal in self.gameset.Goals():
                 diff = (
                     self.keyed_by_homeworld_goal[(homeworld, goal)] -
                     win_points)
@@ -771,64 +826,26 @@ class HomeworldGoalAnalysis:
             ret.append({'homeworld': homeworld,
                         'win_points': bucket_info.win_points,
                         'adjusted_rate': []})
-            for goal in GOALS:
+            for goal in self.gameset.Goals():
                 ret[-1]['adjusted_rate'].append(
                     self.keyed_by_homeworld_goal[(homeworld, goal)])
         return json.dumps(ret)
 
-
-# not called, might be broken by refactor of bucketinfo
-def ComputeWinStatsByHomeworldSkillLevel(games, skill_ratings):
-    untied_games = FilterOutTies(games)
-    NUM_SKILL_BUCKETS = 5
-    skill_buckets = skill_ratings.ComputeRatingBuckets(untied_games,
-                                                       NUM_SKILL_BUCKETS)
-    print skill_buckets
-
-    def HomeworldSkillYielder(player_result, game):
-        for p_result in game.PlayerList():
-            if (skill_ratings.PlayerSkillBucket(
-                    p_result.Name(), skill_buckets) != 
-                NUM_SKILL_BUCKETS - 1):
-                return
-
-        name = player_result.Name()
-        skill_bucket = skill_ratings.PlayerSkillBucket(name, skill_buckets)
-        yield (player_result.Homeworld(), skill_bucket)
-
-    bucketted_stats = ComputeStatsByBucketFromGames(untied_games,
-                                                    HomeworldSkillYielder)
-    keyed_by_hw_rough_skill = {}
-    for bucket in bucketted_stats:
-        keyed_by_hw_rough_skill[bucket.key] = bucket
-                                               
-    print keyed_by_hw_rough_skill
-    ret = {}
-    interesting_skill_range = range(NUM_SKILL_BUCKETS - 1, NUM_SKILL_BUCKETS)
-    for homeworld in HOMEWORLDS:
-        ret[homeworld] = []
-        for i in interesting_skill_range:
-            ret[homeworld].append(keyed_by_hw_rough_skill[(homeworld, i)])
-
-    for k in ret:
-        print k.ljust(25),
-        for win_bucket in ret[k]:
-            print ('%.3f' % win_bucket.win_points).ljust(8),
-            print '+-', ('%.3f' % (win_bucket.win_points_ssd * 2)).ljust(8),
-            print win_bucket.frequency
-        print 
-
-    return ret
-
 class OverviewStats:
     def __init__(self, games):
-        self.max_game_no = 0
+        self.max_genie_id = 0
+        self.max_flex_id = 0
         self.games_played = len(games)
+        self.exps = [0] * len(EXPANSIONS)
         player_size = collections.defaultdict(int)
         race_type = collections.defaultdict(int)
 
         for game in games:
-            self.max_game_no = max(self.max_game_no, game.GameNo())
+            if 'flex' in game.GameId():
+                self.max_flex_id = max(self.max_flex_id, game.GameNo())
+            else:
+                self.max_genie_id = max(self.max_genie_id, game.GameNo())
+                
             adv = ''
             if game.Advanced() == 1:
                 adv = ' adv'
@@ -839,15 +856,23 @@ class OverviewStats:
             race_type_str = 'Base'
             if game.Expansion() == 1:
                 race_type_str = 'Gathering Storm'
+            elif game.Expansion() == 2:
+                race_type_str = 'Rebel vs Imperium'
             if game.GoalGame():
+                if game.Expansion() == 0:
+                    print game
                 race_type_str += ' with Goals'
 
             race_type[race_type_str] += 1
+            self.exps[game.Expansion()] += 1
 
         self.player_size = player_size.items()
         self.player_size.sort()
         self.race_type = race_type.items()
         self.race_type.sort()
+
+    def NumExpansionGames(self, exp_no):
+        return self.exps[exp_no]
 
     def RenderAsHTMLTable(self):
         header_fmt = ('<table border=1><tr><td>%s</td><td>Num Games'
@@ -857,7 +882,10 @@ class OverviewStats:
         html += '</a>'
         html += '<div class="h3">'
         html += 'Total games analyzed: %d<br>\n' % self.games_played
-        html += 'Last seen game number: %d<br>\n' % self.max_game_no
+        if self.max_genie_id:
+            html += 'Last seen genie game number: %d<br>\n' % self.max_genie_id
+        if self.max_flex_id:
+            html += 'Last seen flex game number: %d<br>\n' % self.max_flex_id
         html += header_fmt % 'Player Size'
         for size in self.player_size:
             html += '<tr><td>%s</td><td>%d</td><td>%d%%</td></tr>' % (
@@ -874,8 +902,14 @@ class OverviewStats:
 def PlayerFile(player_name):
     return 'player_' + player_name + '.html'
 
-def PlayerLink(player_name):
-    return '<a href="' + PlayerFile(player_name) + '">' + player_name + '</a>'
+def PlayerLink(player_name, exp=None, anchor_text=None):
+    exp_text = ''
+    if exp is not None:
+        exp_text = exp + '/'
+    if anchor_text is None:
+        anchor_text = player_name
+    return ('<a href="' + exp_text + PlayerFile(player_name) + '">' + 
+            anchor_text + '</a>')
 
 def RenderCardWinGraph(out_file, card_win_info):
     out_file.write("""
@@ -931,81 +965,81 @@ def AdjustedWinPoints(cardWinInfo):
     for per_card_info in observed_norm_win_points:
         print per_card_info[0].ljust(25), ('%.3f' % per_card_info[1]['norm_win_points_per_game']).ljust(20), per_card_info[1]['norm_win_points']
     
-
-def GatheringStormGames(games):
-    return [g for g in games if g.Expansion() == 1]
-
-def NonTiedGatheringStormGames(games):
-    return FilterOutTies(GatheringStormGames(games))
-    
-def RenderGoalVsNonGoalPage(games, rankings_by_game_type):
+def RenderGoalVsNonGoalPage(games, rankings_by_game_type, gameset):
     overview = OverviewStats(games)
-    out = open('output/goals_vs_nongoals.html', 'w')
-    out.write('<html><head><title>' + TITLE + ' goal vs non-goal influence' +
+    out = open('goals_vs_nongoals.html', 'w')
+    out.write('<html><head><title>' + TITLE + ' ' + gameset.exp_name +
+              ' goal vs non-goal influence' +
               '</title>' + JS_INCLUDE + CSS + '</head>')
-    gs_games = NonTiedGatheringStormGames(games)
+    games_from_good_exp = FilterOutTies(games)
     goal_influence_data = GoalInfluenceOnCardStats(
-        PlayerResultsFromGames(gs_games), 
-        rankings_by_game_type.AllGamesRatings())
+        PlayerResultsFromGames(games_from_good_exp), 
+        rankings_by_game_type.AllGamesRatings(), gameset)
     RenderCardAnimationGraph(out, goal_influence_data)
-    open('output/goals_vs_nongoals.json', 'w').write(json.dumps(
+    open('goals_vs_nongoals.json', 'w').write(json.dumps(
         goal_influence_data))
     out.write('</html>')
 
-def RenderGameSizePage(games, rankings_by_game_type):
+def RenderGameSizePage(games, rankings_by_game_type, gameset):
     overview = OverviewStats(games)
-    out = open('output/game_size.html', 'w')
-    out.write('<html><head><title>' + TITLE + ' Game size influence on cards' +
+    out = open('game_size.html', 'w')
+    out.write('<html><head><title>' + TITLE + ' ' + gameset.exp_name + 
+              ' Game size influence on cards' +
               '</title>' + JS_INCLUDE + CSS + '</head>')
-    gs_games = NonTiedGatheringStormGames(games)
+    nontied_games = FilterOutTies(games)
     game_size_data = GameSizeInfluenceOnCardStats(
-        PlayerResultsFromGames(gs_games), 
-        rankings_by_game_type.AllGamesRatings())
+        PlayerResultsFromGames(nontied_games), 
+        rankings_by_game_type.AllGamesRatings(), gameset)
     RenderCardAnimationGraph(out, game_size_data)
-    open('output/game_size.json', 'w').write(json.dumps(
-        game_size_data))
+    open('game_size.json', 'w').write(json.dumps(
+            game_size_data))
     out.write('</html>')
 
-def RenderTopPage(games, rankings_by_game_type):
+def RenderTopGamesetPage(games, rankings_by_game_type, gameset):
     overview = OverviewStats(games)
-    top_out = open('output/index.html', 'w')
+    top_out = open('index.html', 'w')
 
-    top_out.write('<html><head><title>' + TITLE + '</title>' + JS_INCLUDE + 
-                  CSS + '</head>\n')
+    top_out.write('<html><head><title>' + TITLE + ' ' + gameset.exp_name + 
+                  '</title>' + JS_INCLUDE + CSS + '</head>\n')
 
     top_out.write('<body>')
-    top_out.write(INTRO_BLURB)
     top_out.write(overview.RenderAsHTMLTable())
 
-    gathering_storm_games = NonTiedGatheringStormGames(games)
+    nontied_games = FilterOutTies(games)
     top_out.write(WINNING_RATE_VS_PLAY_RATE_DESCRIPTION)
-    top_out.write('<p>From %d Gathering Storm games.</p><br>\n' %
-                  len(gathering_storm_games))    
+    top_out.write('<p>From %d %s games.</p><br>\n' % (
+            len(nontied_games), gameset.exp_name))    
     card_win_info = ComputeWinningStatsByCardPlayed(
-        PlayerResultsFromGames(gathering_storm_games), 
-        rankings_by_game_type.AllGamesRatings())
+        PlayerResultsFromGames(nontied_games), 
+        rankings_by_game_type.AllGamesRatings(), gameset)
     RenderCardWinGraph(top_out, card_win_info)
-    homeworld_goal_analysis = HomeworldGoalAnalysis(games)    
-    top_out.write("""
+    
+    top_out.write(SIX_DEV_BLURB)
+    top_out.write(CARDS_GAME_SIZE)
+    if gameset.Goals(): 
+        top_out.write(CARDS_GOALS)
+
+    if gameset.Goals():
+        homeworld_goal_analysis = HomeworldGoalAnalysis(nontied_games, gameset)
+        top_out.write("""
 <h2>Goal Influence</h2>
   <h3>Goal Influence Graph</h3>
       %s
 <p><canvas id="homeworld_goal_canvas" height=500 width=800>
 </canvas></p>""" % HOMEWORLD_WINNING_RATE_DESCRIPTION)
             
-    top_out.write('<script type="text/javascript">\n' +
-                  'var homeworld_goal_data = ' +
-                  homeworld_goal_analysis.RenderToJson() + ';\n' +
-                  'RenderHomeworldGoalData("homeworld_goal_canvas", '
-                  'homeworld_goal_data);\n' +
-                  '</script>');
+        top_out.write('<script type="text/javascript">\n' +
+                      'var homeworld_goal_data = ' +
+                      homeworld_goal_analysis.RenderToJson() + ';\n' +
+                      'RenderHomeworldGoalData("homeworld_goal_canvas", '
+                      'homeworld_goal_data);\n' +
+                      '</script>');
 
-    top_out.write('<h3>Goal Influence Table</h3><p>')
-    top_out.write(homeworld_goal_analysis.RenderStatsAsHtml());
+        top_out.write('<h3>Goal Influence Table</h3><p>')
+        top_out.write(homeworld_goal_analysis.RenderStatsAsHtml());
     
     rankings_by_game_type.RenderAllRankingsAsHTML(top_out)
     top_out.write('</body></html>')
-    # AdjustedWinPoints(card_win_info)
 
 def PlayerToGameList(games):
     players_to_games = collections.defaultdict(list)
@@ -1028,6 +1062,9 @@ class RankingByGameTypeAnalysis:
     def __init__(self, games):
         self.filters = [
             ('all games', 10, lambda game: True),
+            ('rvi', 10, lambda game: game.Expansion() == 2),
+            ('tgs', 10, lambda game: game.Expansion() == 1),
+            ('base', 10, lambda game: game.Expansion() == 0),
             ('goal games', 10, lambda game: game.GoalGame()),
             ('non goal games', 10, lambda game: not game.GoalGame()),
             ('2 player adv', 10, TwoPlayerAdvanced),
@@ -1041,6 +1078,16 @@ class RankingByGameTypeAnalysis:
                 self.filters, self.filt_game_lists):
                 if filter_func(game):
                     filt_list.append(game)
+
+        non_empty_filters = []
+        non_empty_game_lists = []
+        for filter, game_list in zip(self.filters, self.filt_game_lists):
+            if len(game_list) > 0:
+                non_empty_filters.append(filter)
+                non_empty_game_lists.append(game_list)
+
+        self.filters = non_empty_filters
+        self.filt_game_lists = non_empty_game_lists
         
         # MultiSkillModelProbProd -35874.1528902
         # Powered .9 1.0 -35859.9701768
@@ -1139,30 +1186,31 @@ def RenderGameWithPerspective(game, source, target):
     source_result, target_result = GetResultsForNames(game, source, target)
     color = OUTCOME_TO_COLOR[OutcomeWithPerspective(game, source_result, 
                                                     target_result)]
-
-    return ('<a href="http://genie.game-host.org/game.htm?gid=%d">' +
-            '<font color="%s">' + 
-            '%s %s</font></a>') % (game.GameNo(), color,
-                                   RenderTableauShort(source_result),
-                                   RenderTableauShort(target_result))
+    return '<a href="%s"><font color="%s">%s %s</font></a>' % (
+        game.GameId(), color,
+        RenderTableauShort(source_result),
+        RenderTableauShort(target_result))
     
-def ComputeSinglePlayerWinningStats(player, player_games, rating_system):
-    gathering_storm_tableaus = []
+def ComputeSinglePlayerWinningStats(player, player_games, rating_system, 
+                                    gameset):
+    player_tableaus = []
     for game in FilterOutTies(player_games):
-        if game.Expansion() != 1:
-            continue
         for player_result in game.PlayerList():
             if player_result.Name() == player:
-                gathering_storm_tableaus.append(player_result)
+                player_tableaus.append(player_result)
 
-    return ComputeWinningStatsByCardPlayed(gathering_storm_tableaus, 
-                                           rating_system)
+    return ComputeWinningStatsByCardPlayed(player_tableaus, 
+                                           rating_system, gameset)
 
-def RenderPlayerPage(player, player_games, by_game_type_analysis):
+def RenderPlayerPage(player, player_games, by_game_type_analysis, gameset=None):
     overview = OverviewStats(player_games)
-    player_out = open('output/' + PlayerFile(player), 'w')
-    player_out.write('<html><head><title> %s %s'
-                     '</title>%s</head><body>\n' % (TITLE, player, JS_INCLUDE))
+    player_out = open(PlayerFile(player), 'w')
+    game_ver = ''
+    if gameset:
+        game_ver = gameset.exp_name
+    player_out.write('<html><head><title> %s %s %s'
+                     '</title>%s</head><body>\n' % (TITLE, game_ver, 
+                                                    player, JS_INCLUDE))
 
     player_out.write('<a href="#overview">Overview</a> \n'
                      '<a href="#homeworld_flow">Homeworld Rating Flow</a> \n'
@@ -1170,12 +1218,23 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis):
                      '<br>\n')
     player_out.write(overview.RenderAsHTMLTable())
 
-    card_win_info = ComputeSinglePlayerWinningStats(
-        player, player_games, by_game_type_analysis.AllGamesRatings())
-        
-    RenderCardWinGraph(player_out, card_win_info)
+    if gameset:
+        card_win_info = ComputeSinglePlayerWinningStats(
+            player, player_games, 
+            by_game_type_analysis.AllGamesRatings(), gameset)
+        RenderCardWinGraph(player_out, card_win_info)
+    else:
+        player_out.write('<h2>Game version specific player pages</h2>')
+        for exp_no, (exp_abbrev, exp_full) in enumerate(
+            zip(EXP_ABBREV, EXPANSIONS)):
+            exp_games = overview.NumExpansionGames(exp_no)
+            if exp_games:
+                player_out.write(
+                    PlayerLink(player, exp=exp_abbrev, 
+                               anchor_text='\n%d %s games<br>\n' % (
+                            exp_games, EXPANSIONS[exp_no])))
 
-    player_out.write('<a name="homeworld_flow"> '
+    player_out.write('<br><a name="homeworld_flow"> '
                      '<table border=1><tr><td>Homeworld</td>'
                      '<td>Net rating change when playing<td></tr>')
     all_games_ratings = by_game_type_analysis.AllGamesRatings()
@@ -1209,28 +1268,27 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis):
     player_out.write('</table>')
     player_out.write('</html>')
 
-def CopyOrLink(fn, debugging_on):
-    if os.access('output/' + fn, os.O_RDONLY):
-        os.remove('output/' + fn)
+def CopyOrLink(fn, debugging_on, output_dir):
+    if os.access(output_dir + '/' + fn, os.O_RDONLY):
+        os.remove(output_dir + '/' + fn)
     if not debugging_on:
-        shutil.copy(fn, 'output')
+        shutil.copy(fn, output_dir)
     else:
-        os.system('ln -s ./../%s output/%s' % (fn, fn))
+        os.system('ln -s ./../%s %s/%s' % (fn, output_dir, fn))
     
 
-def CopySupportFilesToOutput(debugging_on):
+def CopySupportFilesToOutput(debugging_on, output_dir):
     open('card_attrs.js', 'w').write('var cardInfo = %s;' % 
                                      json.dumps(DeckInfo.card_info_dict, 
                                                 indent=2))
-    CopyOrLink('card_attrs.js', debugging_on)
-    CopyOrLink('genie_analysis.js', debugging_on)
-    CopyOrLink('style.css', debugging_on)
-    CopyOrLink('condensed_games.json.gz', debugging_on)
+    CopyOrLink('card_attrs.js', debugging_on, output_dir)
+    CopyOrLink('genie_analysis.js', debugging_on, output_dir)
+    CopyOrLink('style.css', debugging_on, output_dir)
+    CopyOrLink('condensed_games.json.gz', debugging_on, output_dir)
+    CopyOrLink('condensed_flex.json.gz', debugging_on, output_dir)
     
-    if not os.access('output/flot', os.O_RDONLY):
-        shutil.copytree('flot', 'output/flot')
-    if not os.access('output/images', os.O_RDONLY):
-        shutil.copytree('images', 'output/images')
+    if not os.access(output_dir + '/images', os.O_RDONLY):
+        shutil.copytree('images', output_dir + '/images')
 
 def VivaFringeFormat(games, ratings, output_file):
     gs_2_player_games = [g for g in NonTiedGatheringStormGames(games) if
@@ -1241,7 +1299,7 @@ def VivaFringeFormat(games, ratings, output_file):
         cur_rating = []
         for player_result in game.PlayerList():
             cur_rating.append(
-                ratings.RatingAtGameNo(game.GameNo(), player_result.Name()))
+                ratings.RatingAtGameId(game.GameId(), player_result.Name()))
         winner = game.GameWinners()[0]
         for idx, player_result in enumerate(game.PlayerList()):
             won = 0
@@ -1253,129 +1311,9 @@ def VivaFringeFormat(games, ratings, output_file):
             output_file.write(','.join(str(idx) for idx in full_vector))
             output_file.write('\n')
 
-def ToNumpyMat(player_results, training_set):
-    import numpy as np
-    ret = np.array([result.FullFeatureVector() +
-                    training_set.GetTrainingLabels(result, 1)
-                    for result in player_results], dtype=float)
-    whitened_ret = np.nan_to_num(whiten(ret))
-    return whitened_ret
-
-def ClusterTableaus(tableau_mat, k):
-    from scipy.cluster.vq import vq, kmeans, whiten, kmeans2
-    centroids, variance = kmeans2(tableau_mat, k, 100, minit="points")
-    #centroids, variance = kmeans(tableau_mat, k)
-    code, distance = vq(tableau_mat, centroids)    
-    return centroids, variance, code, distance
-
-def t():
-    games = [Game(g) for g in json.loads(open('condensed_games.json').read())]
-
-    gs_games = [g for g in games if g.Expansion()]
-    gs_tables = []
-    for g in gs_games:
-        gs_tables.extend(g.PlayerList())
-    training_set = TrainingSet()
-    mat = ToNumpyMat(gs_tables, training_set)
-    cents, var, code, dists = ClusterTableaus(mat, 10)
-
-    clusters = collections.defaultdict(list)
-    tableau_labels = {}
-    for tableau, code_val, dist in zip(gs_tables, code, dists):
-        clusters[code_val].append((tableau, dist))
-        tableau_labels[(tableau.Name(), tableau.Game().GameNo())] = code_val
-
-    import random
-    for clust_ind, members in clusters.iteritems():
-        print len(members),
-        labels_for_clust = collections.defaultdict(int)
-        for member, dist in members:
-            for idx, val in enumerate(training_set.GetLabels(member)):
-                labels_for_clust[idx] += val
-        for label_ind, val in labels_for_clust.iteritems():
-            if val > 0:
-                print training_set.GetLabelName(label_ind), val,
-        for member in sorted(members, key = lambda x: x[1])[:3]:
-            print member
-        for member in random.sample(members, 2):
-            print member
-        print
-    print training_set.Error(tableau_labels)
-
-
-class TrainingSet:
-    def __init__(self, training_frac=.5, fn=None):
-        if not fn:
-            fn = 'golden_labels.csv'
-
-        self.labelled_tableaus = collections.defaultdict(list)
-        self.labels = set()
-        self.labelled_game_nos = set()
-        for line in open(fn, 'r'):
-            split_line = line.strip().split(',')
-            player, game_no = split_line[0], int(split_line[1])
-            cur_labels = split_line[2:]
-            
-            self.labels.update(cur_labels)
-            self.labelled_tableaus[(player, game_no)] = cur_labels
-            self.labelled_game_nos.add(game_no)
-            
-        self.labels = sorted(list(self.labels))
-        self.training_labels = collections.defaultdict(list)
-        self.testing_labels = collections.defaultdict(list)
-
-        training_size = int(len(self.labelled_tableaus) * training_frac)
-        for tableau_key in random.sample(self.labelled_tableaus, training_size):
-            self.training_labels[tableau_key] = (
-                self.labelled_tableaus[tableau_key])
-            
-        for tableau_key in self.labelled_tableaus:
-            if not tableau_key in self.training_labels:
-                self.testing_labels[tableau_key] = (
-                    self.labelled_tableaus[tableau_key])
-
-    def HasGameNo(self, game_no):
-        return game_no in self.labelled_game_nos
-
-    def _GetLabels(self, player_result, src, weight):
-        ret = [0] * len(self.labels)
-        key = player_result.Name(), player_result.Game().GameNo()
-        if key in src:
-            applicable_labels = src[key]
-            weight_per_label = 0 / len(applicable_labels)
-            for label in applicable_labels:
-                ret[self.labels.index(label)] = weight_per_label
-        return ret
-
-    def GetLabels(self, player_result):
-        return self._GetLabels(player_result, self.labelled_tableaus, 1)
-
-    def GetTrainingLabels(self, player_result, weight):
-        return self._GetLabels(player_result, self.training_labels, weight)
-
-    def GetLabelName(self, label_ind):
-        return self.labels[label_ind]
-
-    def Error(self, output_clusters):
-        tableau_keys = [t for t in self.testing_labels if t in
-                        output_clusters]
-        error_count = 0
-        right_count = 0
-        for x in range(len(tableau_keys)):
-            x_labels = set(self.testing_labels[tableau_keys[x]])
-            x_output_label = output_clusters[tableau_keys[x]]
-            for y in range(x + 1, len(tableau_keys)):
-                y_labels = set(self.testing_labels[tableau_keys[y]])
-                y_output_label = output_clusters[tableau_keys[y]]
-                error = bool((x_labels).intersection(y_labels)) ^ (
-                    y_output_label == x_output_label)
-                error_count += error
-                right_count += (1 - error)
-        return right_count, error_count
-
 def DumpSampleGamesForDebugging(games):
     training_set = TrainingSet()
-    retained_games = [g for g in games if training_set.HasGameNo(g['game_no'])]
+    retained_games = [g for g in games if training_set.HasGameId(g['game_id'])]
     
     open('terse_games.json', 'w').write(
         json.dumps(retained_games + random.sample(games, 1000 - len(
@@ -1408,15 +1346,15 @@ class PointDistribution:
                 'stdDev': self.observer.StdDev()}
 
 
-def Analyze6Devs(games):
+def Analyze6Devs(gameset):
     dists_with = collections.defaultdict(PointDistribution)
     dists_without = collections.defaultdict(PointDistribution)
     tableau_ct = 0
-    for g in GatheringStormGames(games):
+    for g in gameset.games:
         for p in g.PlayerList():
             tableau_ct += 1
             tab_scorer = tableau_scorer.TableauScorer(p.Cards(), p.Chips())
-            for card in DeckInfo.SixDevList():
+            for card in gameset.Deck().SixDevList():  
                 hypo_score = tab_scorer.Hypothetical6DevScore(card)
                 if card in p.Cards():
                     dists_with[card].AddOutcome(hypo_score)
@@ -1424,14 +1362,14 @@ def Analyze6Devs(games):
                     dists_without[card].AddOutcome(hypo_score)
 
     six_dev_summary = {}
-    for card in DeckInfo.SixDevList():
+    for card in gameset.Deck().SixDevList():
         six_dev_summary[card] = {
             'played': dists_with[card].BoxPlotData(tableau_ct),
             'unplayed': dists_without[card].BoxPlotData(tableau_ct)
             }    
 
-    output_file = file('output/six_dev_analysis.html', 'w')
-    output_file.write("""<html><head><title> %s: 6 Dev Point Distribution
+    output_file = file('six_dev_analysis.html', 'w')
+    output_file.write("""<html><head><title> %s %s: 6 Dev Point Distribution
     </title>%s %s
 </head><body>
 <div id="point_plot" style="width:1000px;height:600px"></div>
@@ -1442,12 +1380,13 @@ var six_dev_summary = %s;
 p.Render(six_dev_summary);
 </script>
 </body>
-</html>""" % (TITLE, JS_INCLUDE, CSS, json.dumps(six_dev_summary, indent=2)))
+</html>""" % (TITLE, gameset.exp_ver,
+              JS_INCLUDE, CSS, json.dumps(six_dev_summary, indent=2)))
 
 def ConvertToMongoDBFormat(games, gamelist_name):
     out = open(gamelist_name + '.mongo.json', 'w')
     for g in games:
-        g['_id'] = 'genie' + str(g['game_no'])
+        raise 123         # g['_id'] = 'genie' + str(g['game_no']) 
         out.write(json.dumps(g) + '\n')
 
 def LoadGames(debugging, gamelist_name):
@@ -1471,42 +1410,74 @@ def LoadGames(debugging, gamelist_name):
         # DumpSampleGamesForDebugging(games)
     # ConvertToMongoDBFormat(games, gamelist_name)
     return map(Game, games)
+
+def ChangeToMaybeNewDir(dir_name, debugging_on):
+    orig = os.getcwd()
+    if not os.access(dir_name, os.O_RDONLY):
+        os.mkdir(dir_name)
+    CopySupportFilesToOutput(debugging_on, dir_name)
+    os.chdir(dir_name)
+    return orig
+
+def RenderGameset(gameset, output_dir, debugging_on):
+    orig_dir = ChangeToMaybeNewDir(output_dir, debugging_on)
+
+    by_game_type_analysis = RankingByGameTypeAnalysis(gameset.games)
+    RenderTopGamesetPage(gameset.games, by_game_type_analysis, gameset)
+    if len(gameset.Goals()):
+        RenderGoalVsNonGoalPage(gameset.games, by_game_type_analysis, gameset)
+    RenderGameSizePage(gameset.games, by_game_type_analysis, gameset)
+
+    for player, player_games in PlayerToGameList(gameset.games).iteritems():
+        RenderPlayerPage(player, player_games, by_game_type_analysis, gameset)
+
+    Analyze6Devs(gameset)
+    os.chdir(orig_dir)
+
+def RenderTopPage(games, debugging_on):
+    orig_dir = ChangeToMaybeNewDir('output', debugging_on)
+    out = open('index.html', 'w')
+    out.write('<html><head><title>' + TITLE + '</title>' + JS_INCLUDE + 
+                  CSS + '</head>\n<body>')
+    out.write(INTRO_BLURB)
+    overview = OverviewStats(games)
+    out.write(overview.RenderAsHTMLTable())
+
+    out.write('<h2>Game version specific analysis</h2>')
+    out.write('<p>')
+    for idx, (exp_abbrev, exp_name) in enumerate(zip(EXP_ABBREV,EXPANSIONS)):
+        out.write('<a href=%s/index.html>%d %s games</a><br>' % (
+                exp_abbrev, overview.NumExpansionGames(idx), exp_name))
+
+    rankings = RankingByGameTypeAnalysis(games)
+    rankings.RenderAllRankingsAsHTML(out)
+    out.write('</body>')
+
+    for player, player_games in PlayerToGameList(games).iteritems():
+        RenderPlayerPage(player, player_games, rankings)
+
+    os.chdir(orig_dir)
                 
 def main(argv):
     debugging = False
     t0 = time.time()
-    gamelist = 'condensed_games'
+    gamelists = ['condensed_games', 'condensed_flex']
     if len(argv) > 1:
         debugging = True
-        gamelist = 'terse_games'
+        gamelist = ['terse_games']
 
-    games = LoadGames(debugging, gamelist)
+    games = []
+    for gamelist in gamelists:
+        games.extend(LoadGames(debugging, gamelist))
+
     t1 = time.time()
     print 'games loaded time', t1 - t0
 
-    if not os.access('output', os.O_RDONLY):
-        os.mkdir('output')
+    RenderTopPage(games, debugging)
 
-    CopySupportFilesToOutput(debugging)
-    Analyze6Devs(games)
-    t2 = time.time()
-    print '6 dev stats time', t2 - t1
-
-    by_game_type_analysis = RankingByGameTypeAnalysis(games)
-    #VivaFringeFormat(games, by_game_type_analysis.AllGamesRatings(),
-    #                 open('gs_2_player.csv', 'w'))
-    #print 'exiting early'
-    #return
-    
-    if not os.access('output', os.O_RDONLY):
-        os.mkdir('output')
-    RenderTopPage(games, by_game_type_analysis)
-    RenderGoalVsNonGoalPage(games, by_game_type_analysis)
-    RenderGameSizePage(games, by_game_type_analysis)
-
-    for player, player_games in PlayerToGameList(games).iteritems():
-        RenderPlayerPage(player, player_games, by_game_type_analysis)
-    
+    for idx, exp_abbrev in enumerate(EXP_ABBREV):
+        RenderGameset(FixedExpansionGameSet(games, idx), 
+                      'output/' + exp_abbrev, debugging)
 
 if __name__ == '__main__':
     main(sys.argv)

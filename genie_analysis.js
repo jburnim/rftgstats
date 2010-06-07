@@ -8,7 +8,14 @@ var img_ids = [
 	       "6powers",
 	       "discard",
 	       "4types",
-	       "alien"
+	       "alien",
+	       /*  fill in rvi goal images
+		 "",
+	       "",
+	       "",
+	       "",
+	       ""
+	       */
 	       ];
 var imgs = [];
 
@@ -20,7 +27,11 @@ var homeworld_colors = {'Alpha Centauri': '#663300',
 			"Earth's Lost Colony": '#00CCFF',
 			'New Sparta': '#FF0000',
 			'Separatist Colony': '#555555',
-			'Doomed world': '#000000'};
+			'Doomed world': '#000000',
+                        'Imperium Warlord': '#AA00AA',
+                        'Rebel Cantina': 'FF5555',
+                        'Galactic Developers': '#FF00FF'
+};
 
 function LoadImages() {
     for (var i = 0; i < img_ids.length; ++i) {
@@ -63,13 +74,15 @@ function cardColor(card) {
     case "Free Trade Association":
     case "Consumer Markets":
 	return NOVELTY; 
+    case "Prospecting Guild":
     case "Mining League":
     case "Mining Conglomerate":
     case "Mining Robots":
 	return RARE;
     case "Galactic Genome Project":
     case "Genetics Lab":
-    case "Pan-galactic League":
+    case "Pan Galactic League":
+    case "Uplift Code":
 	return GENES; 
     case "Alien Tech Institute":
 	return ALIEN;
@@ -77,13 +90,24 @@ function cardColor(card) {
     return GRAY;
 }
 
+RED = 'rgba(255, 0, 0, 1.0)';
+PURPLE = 'rgba(192, 0, 192, 1.0)';
+
 function strokeColor(card) {
-    if (card["Military"] == "X"
-      || (card["Type"] == "Development"
-          && (parseInt(card["Strength"]) > 0 || 
-	      card["Name"].indexOf("Imperium") > -1))) {
-    return 'rgba(255, 0, 0, 1.0)';
-  } 
+    if (card["Military"] == "X") {
+	return RED;
+    } 
+    if (card["Name"].indexOf("Imperium") > -1) {
+	return PURPLE;
+    }
+    if (card["Type"] == "Development") {
+	if (parseInt(card["Strength"]) > 0) {
+	    return RED;
+	}
+	if (card["Name"].indexOf("Rebel") > -1) {
+	    return RED;
+	}
+    }
     return 'rgba(0, 0, 0, 1.0)';
 }
 
@@ -199,7 +223,8 @@ function RenderCardWinInfo(data, canvas, wind) {
 
     context.clearRect(0, 0, width, height);
 
-    var lowestBand = window.minProbability * window.minWinRate;
+    var minP = Math.max(window.minProbability, .01);
+    var lowestBand = minP * window.minWinRate;
     var highestBand = window.maxProbability * window.maxWinRate;
     var NUM_BANDS = 10;
     var DETAIL = 200;
@@ -212,12 +237,13 @@ function RenderCardWinInfo(data, canvas, wind) {
 	context.beginPath();
 
 	var curBand = lowestBand + i * (highestBand - lowestBand) / NUM_BANDS;
-	context.moveTo(window.ToCanvasX(window.minProbability), 
-		       window.ToCanvasY(curBand / window.minProbability));
+
+	var x = window.ToCanvasX(minP);
+	var y = window.ToCanvasY(curBand / minP);
+	context.moveTo(x, y);
 		       
 	for (var j = 0; j < DETAIL; ++j) {
-	    var curProb = window.minProbability + 
-		j * (window.maxProbability - window.minProbability) / DETAIL;
+	    var curProb = minP + j * (window.maxProbability - minP) / DETAIL;
 	    var curWin = curBand / curProb;
 	    context.lineTo(window.ToCanvasX(curProb), 
 			   window.ToCanvasY(curWin));
@@ -628,13 +654,14 @@ function PointDistribution(divId) {
     elem.innerHTML = '<h2>Point score distribution for six cost ' + 
 	'developments</h2>' +
 	'<p>I have collected data about the actual and potential score ' +
-	'of all of the six cost developments in the Gathering Storm from ' +
-	'many completed games on Genie. I did this in hopes of gaining some ' +
+	'of all of the six cost developments in Race from ' +
+	'many completed games on Genie or Flex. I did this in hopes of ' +
+	'gaining some ' +
 	'insight into the nature of the game, and in particular, ' +
 	'the cost 6 developments ' +
 	'which tend to be the cornerstone of many strategies. '+
 	'<p>The score distribution for each six cost development in the ' +
-	'Gathering Storm is summarized below. Each six cost development has ' +
+	'Race is summarized below. Each six cost development has ' +
 	'a pair of whisker plots for the point distribution when the dev ' +
 	'was played, and for how it would have scored on tableaus in which ' +
 	'it was not played.  The distributions are clickable to get the ' +
@@ -659,16 +686,6 @@ function PointDistribution(divId) {
     var canvas = document.getElementById("pointDistCanvas");
     var ctx = canvas.getContext('2d');
     var myCtx = MyContext(ctx);
-    var maxDesireX = .2;
-    var maxDesireY = 20;
-    var minDesireX = -.01;
-    var minDesireY = -1;
-    
-    var xRange = maxDesireX - minDesireX;
-    var yRange = maxDesireY - minDesireY;
-
-    myCtx.scale(canvas.width / xRange, -canvas.height / yRange);
-    myCtx.translate(-minDesireX, -maxDesireY);
 
     var whiskerWidth = .0015;
 
@@ -676,6 +693,22 @@ function PointDistribution(divId) {
     var screenXToCardName = [];
 
     ret.Render = function(pointData) {
+	var maxDesireX = 0.0;
+	var maxDesireY = 20;
+	var minDesireX = -.01;
+	var minDesireY = -1;
+
+	for (cardName in pointData) {
+	    maxDesireX = Math.max(maxDesireX, pointData[cardName].played.prob);
+	}
+	maxDesireX *= 1.05;
+
+	var xRange = maxDesireX - minDesireX;
+	var yRange = maxDesireY - minDesireY;
+
+	myCtx.scale(canvas.width / xRange, -canvas.height / yRange);
+	myCtx.translate(-minDesireX, -maxDesireY);
+
 	var pointDataOrder = [];
 	for (cardName in pointData) {
 	    pointDataOrder[pointDataOrder.length] = cardName;

@@ -6,6 +6,7 @@ import os.path
 import re
 import simplejson as json
 import gzip
+from deck_info import DeckInfo
 
 ALL_DIGITS = re.compile('\d+')
 POINTS_RE = re.compile('points = (-?\d+)p')
@@ -15,16 +16,16 @@ GOAL_NUM_RE = re.compile('g(\d+)')
 CARD_NUM_RE = re.compile('has (\d+) card on hand')
 
 GOAL_NUM_TO_NAME = {
-    1: '5 VP',
-    2: 'First 6 Dev',
-    3: 'All Abilities',
-    4: 'First Discard',
-    5: 'All Colors',
-    6: '3 Aliens',
-    10: '4+ Production',
-    11: '4+ Devs',
-    12: '6+ Military',
-    13: '3+ Blue/Brown',
+    1: 'First 5 vps',
+    2: 'First 6 pt dev',
+    3: 'First all phase powers',
+    4: 'First discard',
+    5: 'First all worlds',
+    6: 'First 3 aliens',
+    10: 'Most Prod worlds',
+    11: 'Most Developments',
+    12: 'Most Military',
+    13: 'Most Rares or Novelties',
 }
 
 class BogusGoalNum(Exception):
@@ -49,12 +50,13 @@ def ParseGoals(snip_with_goals):
     return ret
 
 
-def ParseGame(page_contents, card_id_to_name, card_name_to_version):
+def ParseGame(page_contents, card_id_to_name):
     page_contents = page_contents.replace('<br/>', '<br>')
     version_loc = page_contents.index(': Game #')
     version_with_context = page_contents[version_loc-50:version_loc + 50]
 
-    is_exp = 'Gathering Storm' in version_with_context
+    is_gs = 'Gathering Storm' in version_with_context
+    version = int(is_gs)
     using_goals = False
     goals = set()
     if 'Available goals' in version_with_context:
@@ -64,7 +66,8 @@ def ParseGame(page_contents, card_id_to_name, card_name_to_version):
         using_goals = True
 
     ret = {'player_list': [], 
-           'game_no': int(GAME_NUM_RE.search(version_with_context).group(1))}
+           'game_id': ('http://genie.game-host.org/game.htm?gid=' + 
+                       GAME_NUM_RE.search(version_with_context).group(1))}
 
     if 'Status:' not in page_contents:
         print 'could not find status'
@@ -108,8 +111,8 @@ def ParseGame(page_contents, card_id_to_name, card_name_to_version):
                 card_data = card_id_to_name[img]
                 card_name = card_data['name']
                 cards.append(card_name)
-                if 'Gathering' in card_name_to_version[card_name]:
-                    is_exp = True
+                
+                version = max(version, DeckInfo.Version(card_name))
             
         player_result['cards'] = cards
         if using_goals:
@@ -131,7 +134,8 @@ def ParseGame(page_contents, card_id_to_name, card_name_to_version):
 
     ret['advanced'] = int('Action1:' in page_contents and
                           'Action2:' in page_contents)
-    ret['expansion'] = int(is_exp)
+    version = max(version, int(len(goals) > 1))
+    ret['expansion'] = version
     return ret
 
 def main():
@@ -142,11 +146,6 @@ def main():
         id_line = row['BGG img number ID']
         card_id = ALL_DIGITS.search(id_line).group()
         cards_by_id[card_id] = row
-
-    card_attrs = csv.DictReader(open('card_attributes.csv', 'r'))
-    card_name_to_version = {}
-    for row in card_attrs:
-        card_name_to_version[row['Name']] = row['Release']
 
     games = []
     error_sources = []
@@ -160,8 +159,7 @@ def main():
                 continue
 
             full_game_fn = 'data/' + game_data_fn
-            game = ParseGame(open(full_game_fn, 'r').read(), 
-                             cards_by_id, card_name_to_version)
+            game = ParseGame(open(full_game_fn, 'r').read(), cards_by_id)
             if game and len(game['player_list']):
                 games.append(game)
         except BogusGoalNum, e:
