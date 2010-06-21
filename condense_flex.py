@@ -2,6 +2,7 @@ import xml.etree.ElementTree as ET
 
 import copy
 import gzip
+import os
 import simplejson as json
 
 import compute_stats
@@ -83,18 +84,18 @@ def ParseGame(game_node):
 
 if __name__ == '__main__':
     games = []
-    for i in range(1, 6000):
+    for fn in os.listdir('flex2'):
         try:
-            fn = 'data/%d.xml' % i
-            contents = open(fn, 'r').read()
+            full_fn = 'flex2/' + fn
+            contents = open(full_fn, 'r').read()
             if contents == 'error':
                 continue
-            t = ET.parse(fn)
+            t = ET.parse(full_fn)
             g = ParseGame(t.getroot())
             if g:
                 games.append(g)
         except Exception, e:
-            print i, e
+            print full_fn, e
             raise e
 
     json.dump(games, open('condensed_flex.json', 'w'), indent=True)

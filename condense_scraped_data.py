@@ -138,7 +138,7 @@ def ParseGame(page_contents, card_id_to_name):
     ret['expansion'] = version
     return ret
 
-def main():
+def ReadImageIDFile():
     card_id_to_name = csv.DictReader(open('card_names.csv', 'r'))
     cards_by_id = {}
 
@@ -147,6 +147,11 @@ def main():
         card_id = ALL_DIGITS.search(id_line).group()
         cards_by_id[card_id] = row
 
+    return cards_by_id
+
+def main():
+    cards_by_id = ReadImageIDFile()
+    
     games = []
     error_sources = []
     known_errors = []

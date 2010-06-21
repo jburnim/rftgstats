@@ -63,6 +63,7 @@ def ParseGameList(content):
 
 def ReadCompletedGameNos():
     games = simplejson.loads(open('condensed_games.json', 'r').read())
+    # This is broken, should be url based
     completed_game_nums = set([int(g['game_no']) for g in games])
     return completed_game_nums
 
