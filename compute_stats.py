@@ -568,9 +568,11 @@ class SkillRatings:
     def __init__(self, games, skill_model):
         self.skill_model = skill_model
 	self.rating_flow = collections.defaultdict(
-            lambda: collections.defaultdict(int))
+            lambda: collections.defaultdict(float))
 	self.rating_by_homeworld_flow = collections.defaultdict(
-            lambda: collections.defaultdict(int))
+            lambda: collections.defaultdict(float))
+	self.rating_by_opp_homeworld_flow = collections.defaultdict(
+            lambda: collections.defaultdict(float))
         self.model_log_loss = 0.0
         self.winner_pred_log_loss = 0.0
         self.ratings_at_game_id = collections.defaultdict(dict)
@@ -595,6 +597,7 @@ class SkillRatings:
             player_names = [player.Name() for player in
                             game.PlayerList()]
             winner_idx = player_names.index(win_name)
+            winner_hw = game.PlayerList()[winner_idx].Homeworld()
             multiplayer_win_probs = skill_model.MultiplayerWinProb(
                 player_names)
             name_prob_pairs = [(player_name, win_prob) for player_name, win_prob
@@ -614,12 +617,18 @@ class SkillRatings:
 		self.rating_by_homeworld_flow[player_name][homeworld] += (
                     delta[player_name])
 
+
                 if win_name == player_name:
                     continue
+
+                ohf = self.rating_by_opp_homeworld_flow
+                ohf[win_name][homeworld] -= delta[player_name]
+                ohf[player_name][winner_hw] += delta[player_name]
                 # This symettry is wrong for rating systems which are more
                 # general than Elo.
                 self.rating_flow[win_name][player_name] -= delta[player_name]
                 self.rating_flow[player_name][win_name] += delta[player_name]
+
 
             self.GetSkillInfo(win_name).wins += 1.0
 
@@ -645,6 +654,9 @@ class SkillRatings:
 
     def GetHomeworldSkillFlow(self, name):
 	return SortDictByKeys(self.rating_by_homeworld_flow[name])
+
+    def GetOpponentHomeworldSkillFlow(self, name):
+        return SortDictByKeys(self.rating_by_opp_homeworld_flow[name])
 
     def HasPlayer(self, name):
         return name in self.ranking_percentile
@@ -1048,10 +1060,6 @@ def PlayerToGameList(games):
             players_to_games[player.Name()].append(game)
     return players_to_games
 
-def WritePlayerFloatPairsAsTableRows(output_file, pairs):
-    for s, f in pairs:
-        output_file.write('<tr><td>%s</td><td>%.1f</td></tr>\n' % (s, f))
-
 def TwoPlayerAdvanced(game):
     return len(game.PlayerList()) == 2 and game.Advanced()
 
@@ -1174,7 +1182,7 @@ def OutcomeWithPerspective(game, source_result, target_result):
         return LOSE
     return TIE
 
-def CountWinLossTie(games, source, target):
+def CountWinLossTieByPlayer(games, source, target):
     ret = [0, 0, 0]
     for game in games:
         source_result, target_result = GetResultsForNames(game, source, target)
@@ -1190,17 +1198,37 @@ def RenderGameWithPerspective(game, source, target):
         game.GameId(), color,
         RenderTableauShort(source_result),
         RenderTableauShort(target_result))
-    
-def ComputeSinglePlayerWinningStats(player, player_games, rating_system, 
-                                    gameset):
+
+def GetTableausForPlayer(player, player_games):
     player_tableaus = []
     for game in FilterOutTies(player_games):
         for player_result in game.PlayerList():
             if player_result.Name() == player:
                 player_tableaus.append(player_result)
+    return player_tableaus
 
-    return ComputeWinningStatsByCardPlayed(player_tableaus, 
-                                           rating_system, gameset)
+def Compute2PRecordByHomeworld(player_tableaus):
+    player_tableaus = filter(lambda t: len(t.Game().PlayerList()) == 2, 
+                             player_tableaus)
+    my_rec_by_hw = collections.defaultdict(lambda: [0.0, 0.0, 0.0])
+    rec_against_opp_by_hw = collections.defaultdict(lambda: [0.0, 0.0, 0.0])
+
+    for my_tableau in player_tableaus:
+        tableaus = my_tableau.Game().PlayerList()
+        opp_tableau = tableaus[0] if tableaus[1] == my_tableau else tableaus[1]
+        outcome = OutcomeWithPerspective(my_tableau.Game(), my_tableau, 
+                                         opp_tableau)
+        my_rec_by_hw[my_tableau.Homeworld()][outcome] += 1
+        rec_against_opp_by_hw[opp_tableau.Homeworld()][outcome] += 1
+    return my_rec_by_hw, rec_against_opp_by_hw
+
+def RenderRecord(record):
+    return ('<font color="%s">%d</font>-'
+            '<font color="%s">%d</font>-'
+            '<font color="%s">%d</font>' % (
+            OUTCOME_TO_COLOR[WIN], record[WIN], 
+            OUTCOME_TO_COLOR[LOSE], record[LOSE],
+            OUTCOME_TO_COLOR[TIE], record[TIE]))
 
 def RenderPlayerPage(player, player_games, by_game_type_analysis, gameset=None):
     overview = OverviewStats(player_games)
@@ -1211,17 +1239,16 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis, gameset=None):
     player_out.write('<html><head><title> %s %s %s'
                      '</title>%s</head><body>\n' % (TITLE, game_ver, 
                                                     player, JS_INCLUDE))
-
     player_out.write('<a href="#overview">Overview</a> \n'
                      '<a href="#homeworld_flow">Homeworld Rating Flow</a> \n'
                      '<a href="#player_flow">Player Rating Flow</a> \n'
                      '<br>\n')
     player_out.write(overview.RenderAsHTMLTable())
+    player_tableaus = GetTableausForPlayer(player, player_games)
 
     if gameset:
-        card_win_info = ComputeSinglePlayerWinningStats(
-            player, player_games, 
-            by_game_type_analysis.AllGamesRatings(), gameset)
+        card_win_info = ComputeWinningStatsByCardPlayed(
+            player_tableaus, by_game_type_analysis.AllGamesRatings(), gameset)
         RenderCardWinGraph(player_out, card_win_info)
     else:
         player_out.write('<h2>Game version specific player pages</h2>')
@@ -1234,14 +1261,33 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis, gameset=None):
                                anchor_text='\n%d %s games<br>\n' % (
                             exp_games, EXPANSIONS[exp_no])))
 
+    player_out.write('<table id="homeworld_flow_tables"><tr><td>')
     player_out.write('<br><a name="homeworld_flow"> '
                      '<table border=1><tr><td>Homeworld</td>'
-                     '<td>Net rating change when playing<td></tr>')
+                     '<td>Net rating change</td>'
+                     '<td>2 Player record</td></tr>')
     all_games_ratings = by_game_type_analysis.AllGamesRatings()
-    WritePlayerFloatPairsAsTableRows(
-        player_out, all_games_ratings.GetHomeworldSkillFlow(player))
-
+    my_rec_by_hw, my_rec_against_hw = Compute2PRecordByHomeworld(
+        player_tableaus)
+    skill_flows = all_games_ratings.GetHomeworldSkillFlow(player)
+    for homeworld, net_rating_flow in skill_flows:
+        player_out.write('<tr><td>%s</td><td>%.1f</td><td>%s</td></tr>\n' % (
+                homeworld, net_rating_flow, 
+                RenderRecord(my_rec_by_hw[homeworld])))
     player_out.write('</table>')
+
+    player_out.write('</td><td>')
+
+    player_out.write('<br><table border=1><tr><td>Opponent Homeworld</td>'
+                     '<td>Net flow against</td><td>2P rec against</td></tr>')
+    opp_skill_flows = all_games_ratings.GetOpponentHomeworldSkillFlow(player)
+    for homeworld, net_rating_flow in opp_skill_flows:
+        player_out.write('<tr><td>%s</td><td>%.1f</td><td>%s</td></tr>\n' % (
+                homeworld, net_rating_flow, 
+                RenderRecord(my_rec_against_hw[homeworld])))
+    player_out.write('</table>') # opponent flow table
+    player_out.write('</table>') # homeworld_flow_tables
+
 
     paired_games = KeyGamesByOpponent(player, player_games)
 
@@ -1249,19 +1295,22 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis, gameset=None):
                      '<table border=1><tr><td>Opponent</td>'
                      '<td>Net rating flow</td><td>Record</td></tr>\n')
     for opponent, skill_flow in all_games_ratings.GetRatingFlow(player):
-        record = CountWinLossTie(paired_games[opponent], player, opponent)
+        
+        record = CountWinLossTieByPlayer(
+            paired_games[opponent], player, opponent)
         player_out.write('<tr><td>%s</td><td>%.1f</td>'
-                         '<td><font color="%s">%d</font>-'
-                         '<font color="%s">%d</font>-'
-                         '<font color="%s">%d</font></td>' % (
-                PlayerLink(opponent), skill_flow, 
-                OUTCOME_TO_COLOR[WIN], record[WIN], 
-                OUTCOME_TO_COLOR[LOSE], record[LOSE],
-                OUTCOME_TO_COLOR[TIE], record[TIE]))
+                         '<td>%s</td>' % (
+                PlayerLink(opponent), skill_flow, RenderRecord(record)))
+            
+        ct = 3
         for game in paired_games[opponent]:
             player_out.write('<td>')
             player_out.write(RenderGameWithPerspective(game, player, opponent))
             player_out.write('</td>')
+            ct += 1
+            if ct == 13:
+                player_out.write('</tr><tr><td></td><td></td><td></td>')
+                ct = 3
         player_out.write('</tr>\n')
             
 
@@ -1312,12 +1361,12 @@ def VivaFringeFormat(games, ratings, output_file):
             output_file.write('\n')
 
 def DumpSampleGamesForDebugging(games):
-    training_set = TrainingSet()
-    retained_games = [g for g in games if training_set.HasGameId(g['game_id'])]
+    #training_set = TrainingSet()
+    #retained_games = [g for g in games if training_set.HasGameId(g['game_id'])]
     
     open('terse_games.json', 'w').write(
-        json.dumps(retained_games + random.sample(games, 1000 - len(
-            retained_games))))
+        json.dumps(random.sample(games, 1000)))
+                                 
 
 SAMPLE_INDS = [.05, .25, .5, .75, .95]
 JITTER = [-.03, -.015, 0, .015, .03]
@@ -1406,8 +1455,7 @@ def LoadGames(debugging, gamelist_name):
         games = json.loads(open(gamelist_name + '.json').read())
 
     if not debugging:
-        pass
-        # DumpSampleGamesForDebugging(games)
+        DumpSampleGamesForDebugging(games)
     # ConvertToMongoDBFormat(games, gamelist_name)
     return map(Game, games)
 
@@ -1429,6 +1477,8 @@ def RenderGameset(gameset, output_dir, debugging_on):
     RenderGameSizePage(gameset.games, by_game_type_analysis, gameset)
 
     for player, player_games in PlayerToGameList(gameset.games).iteritems():
+        if debugging_on and player != 'rrenaud' and player != 'Kesterer':
+            continue
         RenderPlayerPage(player, player_games, by_game_type_analysis, gameset)
 
     Analyze6Devs(gameset)
@@ -1459,12 +1509,16 @@ def RenderTopPage(games, debugging_on):
     os.chdir(orig_dir)
                 
 def main(argv):
-    debugging = False
+    debugging, just_flex = False, False
     t0 = time.time()
     gamelists = ['condensed_games', 'condensed_flex']
     if len(argv) > 1:
-        debugging = True
-        gamelist = ['terse_games']
+        if argv[1] == '-d':
+            debugging = True
+            gamelists = ['terse_games']
+        elif argv[1] == '-f':
+            debugging, just_flex = True, True
+            gamelists = ['condensed_flex']
 
     games = []
     for gamelist in gamelists:
@@ -1475,7 +1529,10 @@ def main(argv):
 
     RenderTopPage(games, debugging)
 
-    for idx, exp_abbrev in enumerate(EXP_ABBREV):
+    exp_versions = enumerate(EXP_ABBREV)
+    if just_flex:
+        exp_versions = [(2, "rvi")]
+    for idx, exp_abbrev in exp_versions:
         RenderGameset(FixedExpansionGameSet(games, idx), 
                       'output/' + exp_abbrev, debugging)
 
