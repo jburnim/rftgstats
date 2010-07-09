@@ -1297,7 +1297,7 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis, gameset=None):
     for opponent, skill_flow in all_games_ratings.GetRatingFlow(player):
         record = CountWinLossTieByPlayer(
             paired_games[opponent], player, opponent)
-        rowspan = len(paired_games[opponent]) / 10 + 1
+        rowspan = (len(paired_games[opponent]) - 1) / 10 + 1
         rendered_rec = RenderRecord(record)
         player_link = PlayerLink(opponent)
         player_out.write(('<tr>'
