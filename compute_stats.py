@@ -1295,22 +1295,27 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis, gameset=None):
                      '<table border=1><tr><td>Opponent</td>'
                      '<td>Net rating flow</td><td>Record</td></tr>\n')
     for opponent, skill_flow in all_games_ratings.GetRatingFlow(player):
-        
         record = CountWinLossTieByPlayer(
             paired_games[opponent], player, opponent)
-        player_out.write('<tr><td>%s</td><td>%.1f</td>'
-                         '<td>%s</td>' % (
-                PlayerLink(opponent), skill_flow, RenderRecord(record)))
-            
-        ct = 3
+        rowspan = len(paired_games[opponent]) / 10 + 1
+        rendered_rec = RenderRecord(record)
+        player_link = PlayerLink(opponent)
+        player_out.write(('<tr>'
+                           '<td rowspan=%(rowspan)d>%(player_link)s</td>'
+                           '<td rowspan=%(rowspan)d>%(skill_flow).1f</td>'
+                           '<td rowspan=%(rowspan)d>%(rendered_rec)s</td>') % 
+                         locals())
+        
+        ct = 0
         for game in paired_games[opponent]:
+            if ct == 10:
+                player_out.write('</tr><tr>')
+                ct = 0
             player_out.write('<td>')
             player_out.write(RenderGameWithPerspective(game, player, opponent))
             player_out.write('</td>')
             ct += 1
-            if ct == 13:
-                player_out.write('</tr><tr><td></td><td></td><td></td>')
-                ct = 3
+    
         player_out.write('</tr>\n')
             
 
