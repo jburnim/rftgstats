@@ -312,6 +312,9 @@ class PlayerResult:
     def Cards(self):
         return self.cards
 
+    def Goals(self):
+        return self.goals
+
     def GoalVector(self, weight = 1):
         ret = [0] * len(GS_GOALS)
         for goal in self.goals:
@@ -422,10 +425,11 @@ class RandomVariableObserver:
     def SampleStdDev(self):
         return (self.Variance() / (self.freq or 1)) ** .5
         
-def ComputeWinningStatsByHomeworld(games):
+def ComputeWinningStatsByHomeworld(games, rating_system):
     def HomeworldYielder(player_result, game):
         yield player_result.Homeworld()
-    return ComputeStatsByBucketFromGames(games, HomeworldYielder)
+    return ComputeStatsByBucketFromGames(games, HomeworldYielder,
+                                         rating_system)
 
 def ComputeStatsByBucketFromPlayerResults(player_results, 
                                           bucketter, rating_system):
@@ -794,19 +798,21 @@ def FilterOutNonGoals(games):
     return [g for g in games if g.GoalGame()]
 
 class HomeworldGoalAnalysis:
-    def __init__(self, games, gameset):
+    def __init__(self, games, gameset, player_ratings):
         self.gameset = gameset
         games = FilterOutNonGoals(games)
         def HomeworldGoalYielder(player_result, game):
             for goal in game.Goals():
                 yield player_result.Homeworld(), goal
         self.bucketted_by_homeworld_goal = ComputeStatsByBucketFromGames(
-            games, HomeworldGoalYielder)
+            games, HomeworldGoalYielder, player_ratings)
         self.keyed_by_homeworld_goal = {}
         for bucket in self.bucketted_by_homeworld_goal:
-            self.keyed_by_homeworld_goal[bucket.key] = bucket.win_points
+            self.keyed_by_homeworld_goal[bucket.key] = bucket.norm_win_points
 
-        self.bucketted_by_homeworld = ComputeWinningStatsByHomeworld(games)
+        self.bucketted_by_homeworld = ComputeWinningStatsByHomeworld(
+            games, player_ratings)
+            
 
     def RenderStatsAsHtml(self):
         html = '<table border=1><tr><td>Homeworld</td>'
@@ -818,7 +824,7 @@ class HomeworldGoalAnalysis:
 
         for bucket_info in self.bucketted_by_homeworld:
             homeworld = bucket_info.key
-            win_points = bucket_info.win_points
+            win_points = bucket_info.norm_win_points
             freq = bucket_info.frequency
             html += '<tr><td>%s</td><td>%.3f</td><td>%d</td>' % (
                 homeworld, win_points, freq)
@@ -831,17 +837,20 @@ class HomeworldGoalAnalysis:
         html += '</table>\n'
         return html
 
-    def RenderToJson(self):
+    def _Serialize(self):
         ret = []
         for bucket_info in self.bucketted_by_homeworld:
             homeworld = bucket_info.key
             ret.append({'homeworld': homeworld,
-                        'win_points': bucket_info.win_points,
+                        'win_points': bucket_info.norm_win_points,
                         'adjusted_rate': []})
             for goal in self.gameset.Goals():
                 ret[-1]['adjusted_rate'].append(
                     self.keyed_by_homeworld_goal[(homeworld, goal)])
-        return json.dumps(ret)
+        return ret
+
+    def RenderToJson(self):
+        return json.dumps(self._Serialize())
 
 class OverviewStats:
     def __init__(self, games):
@@ -1032,7 +1041,9 @@ def RenderTopGamesetPage(games, rankings_by_game_type, gameset):
         top_out.write(CARDS_GOALS)
 
     if gameset.Goals():
-        homeworld_goal_analysis = HomeworldGoalAnalysis(nontied_games, gameset)
+        homeworld_goal_analysis = HomeworldGoalAnalysis(
+            nontied_games, gameset, rankings_by_game_type.AllGamesRatings())
+            
         top_out.write("""
 <h2>Goal Influence</h2>
   <h3>Goal Influence Graph</h3>
@@ -1369,9 +1380,8 @@ def DumpSampleGamesForDebugging(games):
     #training_set = TrainingSet()
     #retained_games = [g for g in games if training_set.HasGameId(g['game_id'])]
     
-    open('terse_games.json', 'w').write(
-        json.dumps(random.sample(games, 1000)))
-                                 
+    open('terse_games.json', 'w').write(json.dumps(random.sample(games, 5000)))
+
 
 SAMPLE_INDS = [.05, .25, .5, .75, .95]
 JITTER = [-.03, -.015, 0, .015, .03]
