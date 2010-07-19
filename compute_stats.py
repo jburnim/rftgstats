@@ -349,50 +349,6 @@ class PlayerResult:
                 card_vec[card_ind] = 1
         return card_vec
 
-    def _TableauSizeRelativeToMax(self):
-        other_max = max(len(player_result.Cards()) for player_result in 
-                        self.Game().PlayerList() if 
-                        player_result.Name() != self.Name())
-        return len(self.Cards()) - other_max
-
-    def FeatureSummary(self):
-        good_counts = [0] * len(GOOD_TYPES)
-        prod_counts = [0] * len(PROD_TYPES)
-        dev_count = 0
-        dev_count_6_cost = 0
-        world_count = 0
-        mil_world_count = 0
-        mil_strength = 0
-        
-        for card in self.Cards():
-            if DeckInfo.CardIsDev(card):
-                dev_count += 1
-                if DeckInfo.Cost(card) == 6:
-                    dev_count_6_cost += 1
-            else:
-                world_count += 1
-
-                good_counts[DeckInfo.GoodType(card)] += 1
-                prod_counts[DeckInfo.ProductionPower(card)] += 1
-
-                mil_world_count += DeckInfo.IsMilWorld(card)
-                mil_strength += DeckInfo.MilitaryStrength(card)
-
-        return prod_counts + good_counts + [
-            #self.points / 30.0,
-            self.chips / 12.0, dev_count, dev_count_6_cost, 
-            world_count, mil_world_count, mil_strength / 2.0, 
-            self._TableauSizeRelativeToMax()
-            ] + self.WonGoalVector()
-            
-    def AlexFeatureVector(self):
-        return self.CardVector(record_places=True) + \
-            self.Game().GoalVector() + self.FeatureSummary() + [
-            self.Name(), self.Game().GameId()]
-
-    def FullFeatureVector(self):
-        return self.CardVector(record_places=False) + self.FeatureSummary()
-
     def Name(self):
         return self.name
 
@@ -766,6 +722,16 @@ def ComputeWinningStatsByCardPlayed(player_results, skill_ratings, gameset):
     return FilterDiscardables(ComputeByCardStats(
             player_results, NonHomeworldCardYielder, skill_ratings, gameset))
 
+def VersionInfluenceOnCardStats(games, skill_ratings):
+    stats_by_ver = []
+    for version_idx, version_abbrev in enumerate(EXP_ABBREV):
+        gameset = FixedExpansionGameSet(games, version_idx)
+        cur_stats = ComputeWinningStatsByCardPlayed(
+            PlayerResultsFromGames(gameset.games), skill_ratings, gameset)
+        stats_by_ver.append({'title': version_abbrev,
+                             'data': cur_stats})
+    return stats_by_ver
+
 def GoalInfluenceOnCardStats(player_results, skill_ratings, gameset):
     with_goals, without_goals = [], []
     for player_result in player_results:
@@ -985,9 +951,20 @@ def AdjustedWinPoints(cardWinInfo):
     print 'name'.ljust(25), 'norm_ppg'.ljust(10)
     for per_card_info in observed_norm_win_points:
         print per_card_info[0].ljust(25), ('%.3f' % per_card_info[1]['norm_win_points_per_game']).ljust(20), per_card_info[1]['norm_win_points']
+
+def RenderCardWinVsGameVersionPage(games, rankings_by_game_type, subtitle):
+    out = open('version_' + subtitle.replace(' ', '_') + '.html', 'w')
+    out.write('<html><head><title>' + TITLE + ' Card win/play rate '
+              'by version ' + subtitle + '</title>' + 
+              JS_INCLUDE + CSS + '</head>')
+    untied_games = FilterOutTies(games)
+    version_influence_data = VersionInfluenceOnCardStats(
+        untied_games, rankings_by_game_type.AllGamesRatings())
+    RenderCardAnimationGraph(out, version_influence_data)
+    
+    out.write('</html>')
     
 def RenderGoalVsNonGoalPage(games, rankings_by_game_type, gameset):
-    overview = OverviewStats(games)
     out = open('goals_vs_nongoals.html', 'w')
     out.write('<html><head><title>' + TITLE + ' ' + gameset.exp_name +
               ' goal vs non-goal influence' +
@@ -1002,7 +979,6 @@ def RenderGoalVsNonGoalPage(games, rankings_by_game_type, gameset):
     out.write('</html>')
 
 def RenderGameSizePage(games, rankings_by_game_type, gameset):
-    overview = OverviewStats(games)
     out = open('game_size.html', 'w')
     out.write('<html><head><title>' + TITLE + ' ' + gameset.exp_name + 
               ' Game size influence on cards' +
@@ -1377,10 +1353,8 @@ def VivaFringeFormat(games, ratings, output_file):
             output_file.write('\n')
 
 def DumpSampleGamesForDebugging(games):
-    #training_set = TrainingSet()
-    #retained_games = [g for g in games if training_set.HasGameId(g['game_id'])]
-    
-    open('terse_games.json', 'w').write(json.dumps(random.sample(games, 5000)))
+    open('terse_games.json', 'w').write(
+        json.dumps(random.sample(games, 5000)))
 
 
 SAMPLE_INDS = [.05, .25, .5, .75, .95]
@@ -1461,7 +1435,7 @@ def LoadGames(debugging, gamelist_name):
         if debugging:
             num_games = db.games.count()
             sample_id = random.randint(0, num_games)
-            games = list(db.games.find(skip = sample_id).limit(1000))
+            games = list(db.games.find(skip = sample_id).limit(5000))
         else:
             games = db.games.find()
     except Exception, e:
@@ -1514,7 +1488,25 @@ def RenderTopPage(games, debugging_on):
         out.write('<a href=%s/index.html>%d %s games</a><br>' % (
                 exp_abbrev, overview.NumExpansionGames(idx), exp_name))
 
+    out.write('<h3>Card play/win graphs as a function of game version</h3>')
+    out.write('<ul><li><a href="version_with_goals.html">With goals.</a>'
+              '    <li><a href="version_without_goals.html">Without goals</a>.'
+              '</ul>')
+
     rankings = RankingByGameTypeAnalysis(games)
+    games_without_goals = []
+    games_with_goals = []
+    for g in games:
+        if g.Expansion() == 0 or g.Goals():
+            games_with_goals.append(g)
+        if g.Expansion() == 0 or not g.Goals():
+            games_without_goals.append(g)
+
+    RenderCardWinVsGameVersionPage(games_without_goals, rankings, 
+                                   'without goals')
+    RenderCardWinVsGameVersionPage(games_with_goals, rankings, 
+                                   'with goals')
+
     rankings.RenderAllRankingsAsHTML(out)
     out.write('</body>')
 

@@ -50,65 +50,76 @@ function GuardFillText(context) {
     return fillText;
 }
 
-
-NOVELTY = 'rgba(0, 192, 255, .6)';
-RARE = 'rgba(120, 60, 0, .6)';
-GENES = 'rgba(75, 255, 0, .6)';
-ALIEN = 'rgba(200, 200, 30, .6)';
-GRAY = 'rgba(75, 75, 75, .6)';
-
 function rgbaToRgb(rgbaStr) {
     return rgbaStr.replace('rgba', 'rgb').replace(/(.*),(.*),(.*),(.*)\)/, 
 						  "$1,$2,$3)");
 }
 
-function cardColor(card) {
-    switch (card["Goods"]) {
-    case "Novelty": return NOVELTY;
-    case "Rare": return RARE;
-    case "Genes": return GENES;
-    case "Alien": return ALIEN;
-    }    
+DEFAULT_ALPHA = 0.6;
 
-    switch (card["Name"]) {
-    case "Free Trade Association":
-    case "Consumer Markets":
-	return NOVELTY; 
-    case "Prospecting Guild":
-    case "Mining League":
-    case "Mining Conglomerate":
-    case "Mining Robots":
-	return RARE;
-    case "Galactic Genome Project":
-    case "Genetics Lab":
-    case "Pan Galactic League":
-    case "Uplift Code":
-	return GENES; 
-    case "Alien Tech Institute":
-	return ALIEN;
+function cardColor(card, alpha) {
+    if (alpha == null) {
+	alpha = DEFAULT_ALPHA;
     }
-    return GRAY;
+    var NOVELTY = '0, 192, 255';
+    var RARE = '120, 60, 0';
+    var GENES = '75, 255, 0';
+    var ALIEN = '200, 200, 30';
+    var GRAY = '75, 75, 75';
+
+    var colorTupleWithoutAlpha = function(card) {
+	switch (card["Goods"]) {
+	case "Novelty": return NOVELTY;
+	case "Rare": return RARE;
+	case "Genes": return GENES;
+	case "Alien": return ALIEN;
+	}    
+
+	switch (card["Name"]) {
+	case "Free Trade Association":
+	case "Consumer Markets":
+	return NOVELTY; 
+	case "Prospecting Guild":
+	case "Mining League":
+	case "Mining Conglomerate":
+	case "Mining Robots":
+	return RARE;
+	case "Galactic Genome Project":
+	case "Genetics Lab":
+	case "Pan Galactic League":
+	case "Uplift Code":
+	return GENES; 
+	case "Alien Tech Institute":
+	return ALIEN;
+	}
+	return GRAY;
+    }
+    return 'rgba(' + colorTupleWithoutAlpha(card) + ',' + alpha + ')';
 }
 
-RED = 'rgba(255, 0, 0, 1.0)';
-PURPLE = 'rgba(192, 0, 192, 1.0)';
-
-function strokeColor(card) {
-    if (card["Military"] == "X") {
-	return RED;
-    } 
-    if (card["Name"].indexOf("Imperium") > -1) {
-	return PURPLE;
-    }
-    if (card["Type"] == "Development") {
-	if (parseInt(card["Strength"]) > 0) {
+function strokeColor(card, alpha) {
+    if (alpha == null) alpha = 1.0;
+    function colorTupleWithoutAlpha(card) {
+	var RED = '255, 0, 0';
+	var PURPLE = '192, 0, 192';
+	var BLACK = '0,0,0';
+	if (card["Military"] == "X") {
 	    return RED;
+	} 
+	if (card["Name"].indexOf("Imperium") > -1) {
+	    return PURPLE;
 	}
-	if (card["Name"].indexOf("Rebel") > -1) {
-	    return RED;
+	if (card["Type"] == "Development") {
+	    if (parseInt(card["Strength"]) > 0) {
+		return RED;
+	    }
+	    if (card["Name"].indexOf("Rebel") > -1) {
+		return RED;
+	    }
 	}
+	return BLACK;
     }
-    return 'rgba(0, 0, 0, 1.0)';
+    return 'rgba(' + colorTupleWithoutAlpha(card) + ',' + alpha + ')';
 }
 
 
@@ -129,9 +140,8 @@ function RenderHomeworldGoalData(canvas_id, data) {
 	    context.drawImage(imgs[i], i * w, top_loc);
 	}
 
-
-	var MAX_RATE = 1.3;
-	var MIN_RATE = .7;
+	var MAX_RATE = 1.4;
+	var MIN_RATE = 0.7;
 	var LEFTOVERS = canvas.height - imgs[0].height;
 
 	function y_coord(r) {
@@ -209,7 +219,10 @@ function WindowBound(width, height) {
     return bound;
 };
 
-function RenderCardWinInfo(data, canvas, wind) {
+function RenderCardWinInfo(data, canvas, wind, alphaPerCard) {
+    if (!alphaPerCard) {
+	alphaPerCard = {}
+    }
     var context = canvas.getContext("2d"), 
 	height = canvas.height, 
 	width = canvas.width,
@@ -290,7 +303,8 @@ function RenderCardWinInfo(data, canvas, wind) {
 	    location[x][y] = [];
 	}
 	location[x][y].push(name);
-	drawCard(context, x, y, cardInfo[name]);
+	drawCard(context, x, y, cardInfo[name], alphaPerCard[name],
+		 alphaPerCard[name]);
     }
     context.fillStyle = 'black';
     context.textAlign = 'start';
@@ -387,6 +401,27 @@ function VectorAdd(a, b) {
     return ret;
 }
 
+function CombineFrame(loFrameData, hiFrameData, interp) {
+    if (loFrameData != null && hiFrameData != null) {
+	return VectorAdd(VectorMul(loFrameData, 1 - interp),
+			 VectorMul(hiFrameData, interp));
+    }
+    if (loFrameData != null) return loFrameData;
+    return hiFrameData;
+}
+
+function LinearInterp(x, low, high) {
+    return x * low + (1 - x) * high;
+}
+
+function CalculateFade(loFrameData, hiFrameData, interp) {
+    var interp = interp * 5 - 4;
+    if (interp < 0) interp = 0;
+    if (loFrameData != null && hiFrameData != null) return DEFAULT_ALPHA;
+    if (loFrameData != null) return LinearInterp(interp, 0, DEFAULT_ALPHA);
+    return LinearInterp(1 - interp, 0, DEFAULT_ALPHA);
+}
+
 function CardDataAnimation(divId) {
     var animator = {};
     var containingDiv = document.getElementById(divId);
@@ -416,8 +451,6 @@ function CardDataAnimation(divId) {
     animator.Start = function() {
 	// make graph interuptible.  the key state is in elapsed, pretty much
 	// everything else is derivable from that.  
-
-
     }
     animator.Render = function(animInfo) {
 	var canvas = document.getElementById('cardWinAnimationCanvas');
@@ -446,18 +479,21 @@ function CardDataAnimation(divId) {
 		}
 		var sInterp = interp * interp * (3 - 2 * interp);
 		var interpData = {};
-		for (var cardName in animInfo[loFrame].data) {
-		    if (!(cardName in animInfo[hiFrame].data)) {
-			throw cardName + " not in hiFrame, confused!";
-		    }
+		var transparency = {}
+		// Should really do a union of the keys and iterate over that.
+		for (var cardName in animInfo[hiFrame].data) {
 		    loFrameCardData = animInfo[loFrame].data[cardName];
 		    hiFrameCardData = animInfo[hiFrame].data[cardName];
 
-		    interpData[cardName] = 
-			VectorAdd(VectorMul(loFrameCardData, 1 - sInterp),
-				  VectorMul(hiFrameCardData, sInterp));
+		    interpData[cardName] = CombineFrame(loFrameCardData,
+							hiFrameCardData,
+							sInterp);
+		    transparency[cardName] = CalculateFade(loFrameCardData,
+							   hiFrameCardData,
+							   sInterp);
+								   
 		}
-		RenderCardWinInfo(interpData, canvas, window);
+		RenderCardWinInfo(interpData, canvas, window, transparency);
 
 		var ctx = canvas.getContext('2d');
 		var fillText = GuardFillText(ctx);
@@ -481,10 +517,10 @@ function CardDataAnimation(divId) {
     return animator;
 }
 
-function drawCard(context, x, y, card) {
+function drawCard(context, x, y, card, fillAlpha, strokeAlpha) {
   context.beginPath();
   var renderSize = parseInt(card["Cost"]) + 2;
-  cardCol = cardColor(card)
+  cardCol = cardColor(card, fillAlpha);
   context.fillStyle = cardCol;
   if (card["Type"] == "World") {
     context.arc(x, y, renderSize + 2, 0, Math.PI*2, true);
@@ -498,7 +534,7 @@ function drawCard(context, x, y, card) {
     context.lineTo(x, y - vert);
   }
 
-  context.strokeStyle = strokeColor(card);
+  context.strokeStyle = strokeColor(card, strokeAlpha);
 
   context.closePath();
   context.fill();
