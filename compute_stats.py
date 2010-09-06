@@ -3,6 +3,7 @@
 import collections
 
 from deck_info import DeckInfo, RVI_HOMEWORLDS, GOOD_TYPES, PROD_TYPES, EXPANSIONS, BaseDeckInfo, GSDeckInfo, DISCARDABLE_CARDS
+from name_handler import name_handler
 import tableau_scorer
 import math
 import pprint
@@ -191,8 +192,11 @@ class FixedExpansionGameSet:
 class Game:
     def __init__(self, game_dict):
         n = float(len(game_dict['player_list']))
+        self.game_id = GetAndRemove(game_dict, 'game_id')
+        server = self.Server()
 
-        self.player_list = map(PlayerResult, game_dict['player_list'])
+        self.player_list = [PlayerResult(p, server)
+                            for p in game_dict['player_list']]
         del game_dict['player_list']
 
         for player_result in self.PlayerList():
@@ -207,7 +211,7 @@ class Game:
         if 'goals' in game_dict:
             self.goals = GetAndRemove(game_dict, 'goals')
 
-        self.game_id = GetAndRemove(game_dict, 'game_id')
+
         self.expansion = GetAndRemove(game_dict, 'expansion')
         self.advanced = GetAndRemove(game_dict, 'advanced')
 
@@ -218,6 +222,12 @@ class Game:
         player_info_string = '\t' + '\n\t'.join(
             str(p) for p in self.PlayerList())
         return '%s %s\n' % (self.GameId(), player_info_string)
+
+    def Server(self):
+        host = self.game_id
+        if host.startswith('http://'): host = host[len('http://'):]
+        host = host[:host.find('.')]
+        return host
 
     def WinningScore(self):
         return max(result.Score() for result in self.PlayerList())
@@ -261,7 +271,7 @@ class Game:
 
 
 class PlayerResult:
-    def __init__(self, player_info_dict):
+    def __init__(self, player_info_dict, server):
         self.cards = GetAndRemove(player_info_dict, 'cards')
 
         self.homeworld = ''
@@ -274,6 +284,7 @@ class PlayerResult:
             self.homeworld = 'Doomed World'
 
         self.name = GetAndRemove(player_info_dict, 'name')
+
         self.points = GetAndRemove(player_info_dict, 'points')
         self.hand = GetAndRemove(player_info_dict, 'hand')
         self.goods = GetAndRemove(player_info_dict, 'goods')
@@ -895,6 +906,10 @@ def PlayerLink(player_name, exp=None, anchor_text=None):
         exp_text = exp + '/'
     if anchor_text is None:
         anchor_text = player_name
+        aliases = ','.join(name_handler.GetAliases(player_name))
+        if aliases:
+            aliases = '(' + aliases + ')'
+        anchor_text = anchor_text + ' ' + aliases
     return ('<a href="' + exp_text + PlayerFile(player_name) + '">' + 
             anchor_text + '</a>')
 
