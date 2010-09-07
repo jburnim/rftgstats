@@ -284,6 +284,10 @@ class PlayerResult:
             self.homeworld = 'Doomed World'
 
         self.name = GetAndRemove(player_info_dict, 'name')
+        rename = name_handler.GetPrimaryName(self.name, server)
+        if self.name != rename:
+            #print self.name, '->', rename
+            self.name = rename
 
         self.points = GetAndRemove(player_info_dict, 'points')
         self.hand = GetAndRemove(player_info_dict, 'hand')

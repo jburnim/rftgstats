@@ -88,7 +88,7 @@ def ParseGame(game_node):
     if game_dict['advanced'] and len(game_dict['player_list']) > 2:
         print 'Confused about advanced', game_node.find('id').text
         return None
-    if len(game_dict['player_list'] <= 1):
+    if len(game_dict['player_list']) <= 1:
         print 'only one player?'
         return None
     

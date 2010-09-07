@@ -10,7 +10,7 @@ class NameHandlerImpl:
             self.collided_names.add(line.strip())
 
         for line in open('aliases.txt', 'r'):
-            split_line = line.split(',')
+            split_line = line.strip().split(',')
             primary = split_line[0]
             
             for source in split_line:
@@ -19,8 +19,8 @@ class NameHandlerImpl:
                     self.aliases[primary].append(source)
 
     def GetPrimaryName(self, name, server):
-        if name in self.collided_names:
-            name = name + '@' + server
+        #if name in self.collided_names:
+        #    name = name + '@' + server
         if name in self.cannonical_name:
             return self.cannonical_name[name]
             
