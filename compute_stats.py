@@ -2,7 +2,7 @@
 
 import collections
 
-from deck_info import DeckInfo, RVI_HOMEWORLDS, GOOD_TYPES, PROD_TYPES, EXPANSIONS, BaseDeckInfo, GSDeckInfo, DISCARDABLE_CARDS
+from deck_info import DeckInfo, BOW_HOMEWORLDS, GOOD_TYPES, PROD_TYPES, EXPANSIONS, BaseDeckInfo, GSDeckInfo, RvIDeckInfo, BoWDeckInfo, DISCARDABLE_CARDS
 from name_handler import name_handler
 import tableau_scorer
 import math
@@ -15,7 +15,11 @@ import shutil
 import sys
 import time
 
-EXP_ABBREV = ['base', 'tgs', 'rvi']
+outputDir = 'output'
+runDir = os.getcwd()
+
+EXP_ABBREV = ['base', 'tgs', 'rvi', 'bow']
+EXP_ABBREV_EXPANSIONS = zip(EXP_ABBREV, EXPANSIONS)
 
 BASE_SKILL = 1500
 MOVEMENT_CONST = 15
@@ -41,6 +45,14 @@ RVI_GOALS = GS_GOALS + [
     'First 8 Tableau'
 ]
 
+BOW_GOALS = RVI_GOALS + [
+    'Most Consume Powers',
+    'Most Prestige',
+    'First 2 Prestige + 3 vps',
+    'First peace / war',
+    'First military influence'
+    ]
+
 MATCH_TRAILING_DIGITS = re.compile('(\d+)$')
 
 # move to deck info
@@ -59,15 +71,15 @@ statistics page by <a href="player_rrenaud.html">rrenaud</a>,
 <a href="player_Aragos.html">Aragos</a>.
 All of the data here is collected from the wonderful
 <a href="http://genie.game-host.org">Genie online Race for the Galaxy server
-</a> or the <a href="http://flexboardgames.com/Rftg.html">Flexboardgames Race
-for the Galaxy server</a>.  The code that computes this information is 
+</a>, the <a href="http://flexboardgames.com/Rftg.html">Flexboardgames Race
+for the Galaxy server</a>, or <a href="http://www.keldon.net/rftg">Keldon's Race for the Galaxy server</a>.  The code that computes this information is 
 open source and available
 at <a href="http://code.google.com/p/rftgstats">the rftgstats google code
 project</a>.  These stats look best when viewed with a recent version of 
 <a href="http://mozilla.org">Firefox 3</a> or <a
 href="http://www.google.com/chrome">Chrome</a>.  The raw data from genie is
 available <a href="condensed_games.json.gz">here</a>. The raw data from flex is
-available <a href="condensed_flex.json.gz">here</a>. Contributions
+available <a href="condensed_flex.json.gz">here</a>. The raw data from keldon is available <a href="condensed_keldon.json.gz">here</a>.  Contributions
 welcome!</p>"""
 
 SIX_DEV_BLURB = """<h3>Sub-analysis</h3>
@@ -152,7 +164,7 @@ rather than game end time, as Genie does.  Since there are some players who game
 the Genie system, I suspect this method may be slightly more accurate simply
 because players do not have much of an incentive to game it.</li>
 <li>This includes games from flex, which are currently all assumed to occur
-after the last game on genie.</li>
+after the last game on genie.  Similarly, all games from keldon are assumed to occur after the last game on flex.</li>
 </ul>
 """
 
@@ -180,7 +192,10 @@ class FixedExpansionGameSet:
             self.deck = GSDeckInfo
         elif exp_ver == 2:
             self.goals = RVI_GOALS
-            self.deck = DeckInfo
+            self.deck = RvIDeckInfo
+        elif exp_ver == 3:
+            self.goals = BOW_GOALS
+            self.deck = BoWDeckInfo
 
     def Goals(self):
         return self.goals
@@ -202,7 +217,15 @@ class Game:
         for player_result in self.PlayerList():
             player_result.SetWinPoints(0.0)
             player_result.SetGame(self)
+        if 'winners' in game_dict:
+            winners = []
+            for name in game_dict['winners']:
+                for player in self.player_list:
+                    if player.Name() == name:
+                        winners.append(player)
+            self.winners = winners
         winners = self.GameWinners()
+
         for player_result in winners:
             player_result.SetWinPoints(n / len(winners))
         self.player_list.sort(key = PlayerResult.WinPoints, reverse=True)
@@ -230,9 +253,15 @@ class Game:
         return host
 
     def WinningScore(self):
-        return max(result.Score() for result in self.PlayerList())
+        ret = float('-inf')
+        for result in self.PlayerList():
+            ret = max(ret, result.Score())
+        return ret
+        #return max(result.Score() for result in self.PlayerList())
 
     def GameWinners(self):
+        if 'winners' in vars(self):
+            return self.winners
         max_score = self.WinningScore()
         return [p for p in self.PlayerList() if p.Score() == max_score]
 
@@ -278,10 +307,11 @@ class PlayerResult:
         # This misclassifes initial doomed world settles that are
         # other homeworlds.  I doubt that happens all that often
         # though.
-        if self.cards[0] in RVI_HOMEWORLDS:
-            self.homeworld = self.cards[0]
-        else:
-            self.homeworld = 'Doomed World'
+        if len(self.cards):
+            if self.cards[0] in BOW_HOMEWORLDS:
+                self.homeworld = self.cards[0]
+            else:
+                self.homeworld = 'Doomed World'
 
         self.name = GetAndRemove(player_info_dict, 'name')
         rename = name_handler.GetPrimaryName(self.name, server)
@@ -292,6 +322,8 @@ class PlayerResult:
         self.points = GetAndRemove(player_info_dict, 'points')
         self.hand = GetAndRemove(player_info_dict, 'hand')
         self.goods = GetAndRemove(player_info_dict, 'goods')
+        if 'prestige' in player_info_dict:
+            self.prestige = GetAndRemove(player_info_dict, 'prestige')
 
         self.goals = []
         if 'goals' in player_info_dict:
@@ -321,6 +353,10 @@ class PlayerResult:
     def Score(self):
         return self.points * 100 + self.goods + self.hand
 
+    def Prestige(self):
+        if 'prestige' in vars(self):
+            return self.prestige
+        return 0
     def Chips(self):
         return self.chips
 
@@ -506,28 +542,28 @@ class MultiSkillModelProbProd(EloSkillModel):
 
     def MultiplayerWinProb(self, player_list):
         ret = []
-        for idx, player1 in enumerate(player_list):
+        for player1 in player_list:
             ret.append(1)
             for player2 in player_list:
                 if player1 != player2:
-                    ret[idx] = ret[idx] * self.Predict(player1, player2)
+                    ret[-1] = ret[-1] * self.Predict(player1, player2)
                     
         return NormalizeProbs(ret)
 
 class PoweredSkillModelProbProd(EloSkillModel):
-    def __init__(self, base_rating, move_const, pow3, pow4):
+    def __init__(self, base_rating, move_const, pow3, pow4, pow5, pow6):
         EloSkillModel.__init__(self, base_rating, move_const)
-        self.pows = [1, 1, 1, pow3, pow4]
+        self.pows = [1, 1, 1, pow3, pow4, pow5, pow6]
 
     def MultiplayerWinProb(self, player_list):
         ret = []
-        for idx, player1 in enumerate(player_list):
+        for player1 in player_list:
             ret.append(1)
             for player2 in player_list:
                 if player1 != player2:
                     p = self.Predict(player1, player2) ** self.pows[
                         len(player_list)]
-                    ret[idx] = ret[idx] * p
+                    ret[-1] = ret[-1] * p
                     
         return NormalizeProbs(ret)
     
@@ -575,8 +611,7 @@ class SkillRatings:
             winner_hw = game.PlayerList()[winner_idx].Homeworld()
             multiplayer_win_probs = skill_model.MultiplayerWinProb(
                 player_names)
-            name_prob_pairs = [(player_name, win_prob) for player_name, win_prob
-                               in zip(player_names, multiplayer_win_probs)]
+            name_prob_pairs = zip(player_names, multiplayer_win_probs)
             self.prob_won_at_game_id[game_id] = name_prob_pairs
             pred = multiplayer_win_probs[winner_idx]
             self.winner_pred_log_loss += math.log(pred) / math.log(2)
@@ -731,7 +766,7 @@ def ComputeByCardStats(player_results, card_yielder, skill_ratings, gameset):
 def ComputeWinningStatsByCardPlayed(player_results, skill_ratings, gameset):
     def NonHomeworldCardYielder(player_result, game):
         for idx, card in enumerate(player_result.Cards()):
-            if not (idx == 0 and card in RVI_HOMEWORLDS or
+            if not (idx == 0 and card in BOW_HOMEWORLDS or
                     card == 'Gambling World'):
                 yield card
     return FilterDiscardables(ComputeByCardStats(
@@ -787,7 +822,7 @@ class HomeworldGoalAnalysis:
                 yield player_result.Homeworld(), goal
         self.bucketted_by_homeworld_goal = ComputeStatsByBucketFromGames(
             games, HomeworldGoalYielder, player_ratings)
-        self.keyed_by_homeworld_goal = {}
+        self.keyed_by_homeworld_goal = collections.defaultdict(lambda :0)
         for bucket in self.bucketted_by_homeworld_goal:
             self.keyed_by_homeworld_goal[bucket.key] = bucket.norm_win_points
 
@@ -837,6 +872,7 @@ class OverviewStats:
     def __init__(self, games):
         self.max_genie_id = 0
         self.max_flex_id = 0
+        self.max_keldon_id = 0
         self.games_played = len(games)
         self.exps = [0] * len(EXPANSIONS)
         player_size = collections.defaultdict(int)
@@ -845,6 +881,8 @@ class OverviewStats:
         for game in games:
             if 'flex' in game.GameId():
                 self.max_flex_id = max(self.max_flex_id, game.GameNo())
+            elif 'keldon' in game.GameId():
+                self.max_keldon_id = max(self.max_keldon_id, game.GameNo())
             else:
                 self.max_genie_id = max(self.max_genie_id, game.GameNo())
                 
@@ -860,6 +898,8 @@ class OverviewStats:
                 race_type_str = 'Gathering Storm'
             elif game.Expansion() == 2:
                 race_type_str = 'Rebel vs Imperium'
+            elif game.Expansion() == 3:
+                race_type_str = 'Brink of War'
             if game.GoalGame():
                 if game.Expansion() == 0:
                     print game
@@ -888,6 +928,8 @@ class OverviewStats:
             html += 'Last seen genie game number: %d<br>\n' % self.max_genie_id
         if self.max_flex_id:
             html += 'Last seen flex game number: %d<br>\n' % self.max_flex_id
+        if self.max_keldon_id:
+            html += 'Last seen keldon game number: %d<br>\n' % self.max_keldon_id
         html += header_fmt % 'Player Size'
         for size in self.player_size:
             html += '<tr><td>%s</td><td>%d</td><td>%d%%</td></tr>' % (
@@ -1036,6 +1078,15 @@ def RenderTopGamesetPage(games, rankings_by_game_type, gameset):
         top_out.write(CARDS_GOALS)
 
     if gameset.Goals():
+	if gameset.exp_ver == 1:
+	    width = 820
+	elif gameset.exp_ver == 2:
+	    width = 1100
+	elif gameset.exp_ver == 3:
+	    width = 1380
+	else:
+	    width = 1600
+	    print "Warning, the goal graph width needs to be updated to support expansion", EXPANSIONS[gameset.exp_ver]
         homeworld_goal_analysis = HomeworldGoalAnalysis(
             nontied_games, gameset, rankings_by_game_type.AllGamesRatings())
             
@@ -1043,8 +1094,8 @@ def RenderTopGamesetPage(games, rankings_by_game_type, gameset):
 <h2>Goal Influence</h2>
   <h3>Goal Influence Graph</h3>
       %s
-<p><canvas id="homeworld_goal_canvas" height=500 width=800>
-</canvas></p>""" % HOMEWORLD_WINNING_RATE_DESCRIPTION)
+<p><canvas id="homeworld_goal_canvas" height=500 width=%d>
+</canvas></p>""" % (HOMEWORLD_WINNING_RATE_DESCRIPTION, width))
             
         top_out.write('<script type="text/javascript">\n' +
                       'var homeworld_goal_data = ' +
@@ -1076,6 +1127,7 @@ class RankingByGameTypeAnalysis:
     def __init__(self, games):
         self.filters = [
             ('all games', 10, lambda game: True),
+            ('bow', 10, lambda game: game.Expansion() == 3),
             ('rvi', 10, lambda game: game.Expansion() == 2),
             ('tgs', 10, lambda game: game.Expansion() == 1),
             ('base', 10, lambda game: game.Expansion() == 0),
@@ -1084,7 +1136,9 @@ class RankingByGameTypeAnalysis:
             ('2 player adv', 10, TwoPlayerAdvanced),
             ('2 player not adv', 10, TwoPlayerNotAdvanced),
             ('3 player', 7, lambda game: len(game.PlayerList()) == 3),
-            ('4 player', 5, lambda game: len(game.PlayerList()) == 4)
+            ('4 player', 5, lambda game: len(game.PlayerList()) == 4),
+            ('5 player', 5, lambda game: len(game.PlayerList()) == 5),
+            ('6 player', 5, lambda game: len(game.PlayerList()) == 6)
             ]
         self.filt_game_lists = [[] for filt in self.filters]
         for game in games:
@@ -1115,7 +1169,7 @@ class RankingByGameTypeAnalysis:
         # UberNaive -38744.6919391
         self.rating_systems = [
             SkillRatings(games, PoweredSkillModelProbProd(
-                    BASE_SKILL, MOVEMENT_CONST, .72, .6))
+                    BASE_SKILL, MOVEMENT_CONST, .72, .6, .5, .4)) # I just made up the .5, .4; what should it be?
             for games in self.filt_game_lists]
         print self.rating_systems[0].winner_pred_log_loss
 
@@ -1259,7 +1313,8 @@ def RenderPlayerPage(player, player_games, by_game_type_analysis, gameset=None):
     else:
         player_out.write('<h2>Game version specific player pages</h2>')
         for exp_no, (exp_abbrev, exp_full) in enumerate(
-            zip(EXP_ABBREV, EXPANSIONS)):
+            #zip(EXP_ABBREV, EXPANSIONS)):
+            EXP_ABBREV_EXPANSIONS):
             exp_games = overview.NumExpansionGames(exp_no)
             if exp_games:
                 player_out.write(
@@ -1334,18 +1389,31 @@ def CopyOrLink(fn, debugging_on, output_dir):
     if not debugging_on:
         shutil.copy(fn, output_dir)
     else:
-        os.system('ln -s ./../%s %s/%s' % (fn, output_dir, fn))
-    
+        os.system('ln -s %s/%s %s/%s' % (runDir, fn, output_dir, fn))
 
+def CreateAnalysisJS(output_dir):
+    numGoals = 10
+    if output_dir[-3:] == 'rvi':
+        numGoals = 15
+    elif output_dir[-3:] == 'bow':
+        numGoals = 20
+    iString = open('genie_analysis.js', 'r').read()
+    oFile = open( output_dir + '/genie_analysis.js', 'w' )
+    oFile.write("var img_ids_num = " + str(numGoals) + ";\n")
+    oFile.write(iString)
+    oFile.close()
+    
 def CopySupportFilesToOutput(debugging_on, output_dir):
     open('card_attrs.js', 'w').write('var cardInfo = %s;' % 
                                      json.dumps(DeckInfo.card_info_dict, 
                                                 indent=2))
     CopyOrLink('card_attrs.js', debugging_on, output_dir)
-    CopyOrLink('genie_analysis.js', debugging_on, output_dir)
+    #CopyOrLink('genie_analysis.js', debugging_on, output_dir)
+    CreateAnalysisJS(output_dir)
     CopyOrLink('style.css', debugging_on, output_dir)
     CopyOrLink('condensed_games.json.gz', debugging_on, output_dir)
     CopyOrLink('condensed_flex.json.gz', debugging_on, output_dir)
+    CopyOrLink('condensed_keldon.json.gz', debugging_on, output_dir)
     
     if not os.access(output_dir + '/images', os.O_RDONLY):
         shutil.copytree('images', output_dir + '/images')
@@ -1395,6 +1463,8 @@ class PointDistribution:
             avg = 0
             for jitter in JITTER:
                 scaled_ind = int((ind + jitter) * len(self.point_dist))
+                #print scaled_ind
+                #print self.point_dist
                 avg += self.point_dist[scaled_ind]
             summary_stats.append(avg / float(len(JITTER)))
         return {'prob': float(len(self.point_dist)) / tableau_ct, 
@@ -1410,7 +1480,7 @@ def Analyze6Devs(gameset):
     for g in gameset.games:
         for p in g.PlayerList():
             tableau_ct += 1
-            tab_scorer = tableau_scorer.TableauScorer(p.Cards(), p.Chips())
+            tab_scorer = tableau_scorer.TableauScorer(p.Cards(), p.Chips(), p.Prestige())
             for card in gameset.Deck().SixDevList():  
                 hypo_score = tab_scorer.Hypothetical6DevScore(card)
                 if card in p.Cards():
@@ -1493,7 +1563,7 @@ def RenderGameset(gameset, output_dir, debugging_on):
     os.chdir(orig_dir)
 
 def RenderTopPage(games, debugging_on):
-    orig_dir = ChangeToMaybeNewDir('output', debugging_on)
+    orig_dir = ChangeToMaybeNewDir(outputDir, debugging_on)
     out = open('index.html', 'w')
     out.write('<html><head><title>' + TITLE + '</title>' + JS_INCLUDE + 
                   CSS + '</head>\n<body>')
@@ -1503,7 +1573,7 @@ def RenderTopPage(games, debugging_on):
 
     out.write('<h2>Game version specific analysis</h2>')
     out.write('<p>')
-    for idx, (exp_abbrev, exp_name) in enumerate(zip(EXP_ABBREV,EXPANSIONS)):
+    for idx, (exp_abbrev, exp_name) in enumerate(EXP_ABBREV_EXPANSIONS):
         out.write('<a href=%s/index.html>%d %s games</a><br>' % (
                 exp_abbrev, overview.NumExpansionGames(idx), exp_name))
 
@@ -1535,9 +1605,9 @@ def RenderTopPage(games, debugging_on):
     os.chdir(orig_dir)
                 
 def main(argv):
-    debugging, just_flex = False, False
+    debugging, just_flex, just_keldon = False, False, False
     t0 = time.time()
-    gamelists = ['condensed_games', 'condensed_flex']
+    gamelists = ['condensed_games', 'condensed_flex', 'condensed_keldon']
     if len(argv) > 1:
         if argv[1] == '-d':
             debugging = True
@@ -1545,6 +1615,9 @@ def main(argv):
         elif argv[1] == '-f':
             debugging, just_flex = True, True
             gamelists = ['condensed_flex']
+        elif argv[1] == '-k':
+            debugging, just_keldon = True, True
+            gamelists = ['condensed_keldon']
 
     games = []
     for gamelist in gamelists:
@@ -1560,7 +1633,7 @@ def main(argv):
         exp_versions = [(2, "rvi")]
     for idx, exp_abbrev in exp_versions:
         RenderGameset(FixedExpansionGameSet(games, idx), 
-                      'output/' + exp_abbrev, debugging)
+                      outputDir + '/' + exp_abbrev, debugging)
 
 if __name__ == '__main__':
     main(sys.argv)

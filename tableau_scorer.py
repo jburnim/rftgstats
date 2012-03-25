@@ -4,6 +4,44 @@ from deck_info import DeckInfo
 from deck_info import NO_GOOD, NOVELTY, RARE, GENES, ALIEN, WINDFALL, PRODUCTION
 import collections
 
+def ScoreUniversalPeaceInstitute(card):
+    ret = 0
+    ret -= DeckInfo.MilitaryStrength(card)
+    ret += DeckInfo.IsMilWorld(card)
+    ret += 2 * (card == "Pan-Galactic Mediator")
+    return ret
+
+def ScoreGoldenAgeofTerraforming(card):
+    if 'Terraforming' in card:
+        return 2 + (DeckInfo.ProductionPower(card) == PRODUCTION)
+    if DeckInfo.CardIsDev(card) and (DeckInfo.Cost(card) == 6):
+        return 1
+    if DeckInfo.ProductionPower(card) == PRODUCTION:
+        return 1
+    return 0
+
+def ScoreAlienCornucopia(card):
+    if 'Alien' in card:
+        return 2
+    if DeckInfo.ProductionPower(card) == PRODUCTION:
+        return 1
+    return 0
+
+def ScorePanGalacticHologrid(card):
+    if card == "Expanding Colony":
+        return 2
+    if DeckInfo.GoodType(card) == NOVELTY:
+        return 2
+    if DeckInfo.CardIsWorld(card):
+        return 1
+    return 0
+
+def ScorePanGalacticAffluence(card):
+    # prestige calc handled by scorer
+    bonus_list = ["Export Duties", "Galactic Renaissance", "Terraformed World"]
+    return (card in bonus_list) * 2
+
+
 def ScoreAlienTechInstitute(card):
     if 'Alien' in card:
         return 2 + (DeckInfo.ProductionPower(card) == PRODUCTION)
@@ -127,11 +165,12 @@ def Score6DevTable():
 _six_dev_score_table = Score6DevTable()
 
 class TableauScorer:
-    def __init__(self, card_list, vp=0):
+    def __init__(self, card_list, vp=0, prestige=0):
         #self.bonus_points_per_card = collections.defaultdict(int)
         self.bonus_points_per_6_dev = collections.defaultdict(int)
         self.card_list = card_list
         self.vp = vp
+        self.prestige = prestige
         self.total_points = self.vp
         for card in card_list:
             if DeckInfo.Is6Dev(card):
@@ -147,16 +186,38 @@ class TableauScorer:
 
         if card == 'Galactic Renaissance':
             score += self.vp / 3
+        elif card == 'Pan-Galactic Affluence':
+            score += self.prestige
         elif card == 'Galactic Exchange':
             good_types = set()
             for other_card in self.card_list:
                 good_types.add(DeckInfo.GoodType(other_card))
             gal_ex_types = len(good_types - set([NO_GOOD]))
             #print 'num good types = ', gal_ex_types
-        elif (card == 'New Galactic Order' and 
-              'Hidden Fortress' in self.card_list):
-            for other_card in self.card_list:
-                mil_worlds_bonus += DeckInfo.IsMilWorld(other_card)
+        elif card == 'New Galactic Order':
+            if 'Hidden Fortress' in self.card_list:
+                for other_card in self.card_list:
+                    mil_worlds_bonus += DeckInfo.IsMilWorld(other_card)
+            if 'Rebel Freedom Fighters' in self.card_list:
+                imp = False
+                for card in self.card_list:
+                    if 'Imperium' in card:
+                        imp = True
+                        break
+                if imp:
+                    score -= 2
+        elif card == 'Universal Peace Institute':
+            if 'Hidden Fortress' in self.card_list:
+                for other_card in self.card_list:
+                    mil_worlds_bonus -= DeckInfo.IsMilWorld(other_card)
+            if 'Rebel Freedom Fighters' in self.card_list:
+                imp = False
+                for card in self.card_list:
+                    if 'Imperium' in card:
+                        imp = True
+                        break
+                if imp:
+                    score += 2
         
         score += gal_ex_types * (gal_ex_types + 1) / 2
         score += mil_worlds_bonus

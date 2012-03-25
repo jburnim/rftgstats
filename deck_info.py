@@ -3,7 +3,7 @@
 import csv
 
 NO_GOOD, NOVELTY, RARE, GENES, ALIEN = GOOD_TYPES = range(5)
-GOOD_TYPE_NAMES = ["", "Novelty", "Rare", "Genes", "Alien"]
+GOOD_TYPE_NAMES = ["", "Novelty", "Rare", "Genes", "Alien", "Any"]
 
 NO_PROD, WINDFALL, PRODUCTION = PROD_TYPES = range(3)
 PROD_TYPE_NAMES = [ "", "Windfall", "Production"]
@@ -17,16 +17,19 @@ GS_HOMEWORLDS = ["Ancient Race", "Damaged Alien Factory",
 RVI_HOMEWORLDS = ["Galactic Developers", "Imperium Warlord", 
                   "Rebel Cantina"] + GS_HOMEWORLDS
 
-EXPANSIONS = ["Race For the Galaxy", "Gathering Storm", "Rebel vs. Imperium"]
+BOW_HOMEWORLDS = ["Rebel Freedom Fighters", "Galactic Scavengers", "Alien Research Team", "Uplift Mercenary Force"] + RVI_HOMEWORLDS
+
+EXPANSIONS = ["Race For the Galaxy", "Gathering Storm", "Rebel vs. Imperium", "Brink of War"]
 DISCARDABLE_CARDS = ['Doomed World', 'Colony Ship', 'New Military Tactics',
-                     'R and D Crash Program', 'Imperium Cloaking Technology']
+                     'R and D Crash Program', 'Imperium Cloaking Technology',
+                     'Imperium Invasion Fleet']
 
 def ZeroUnset(d, k):
     if not d[k]:
         d[k] = 0
 
 def InitDeckInfoDict(filt = lambda x: True):
-    card_info = list(csv.DictReader(open('card_attributes2.csv', 'r')))
+    card_info = list(csv.DictReader(open('card_attributes3.csv', 'r')))
     card_info = filter(filt, card_info)
     card_info_dict = dict((x["Name"], x) for x in card_info)
     for per_card_info in card_info_dict.itervalues():
@@ -122,6 +125,10 @@ class DeckInfoImpl:
         return EXPANSIONS.index(self.card_info_dict[card_name]['Set'])
     
 DeckInfo = DeckInfoImpl(InitDeckInfoDict)
+BoWDeckInfo = DeckInfoImpl(lambda : InitDeckInfoDict(
+        lambda y: y['Set'] in EXPANSIONS[:4]))
+RvIDeckInfo = DeckInfoImpl(lambda : InitDeckInfoDict(
+        lambda y: y['Set'] in EXPANSIONS[:3]))
 GSDeckInfo = DeckInfoImpl(lambda : InitDeckInfoDict(
         lambda y: y['Set'] in EXPANSIONS[:2]))
 BaseDeckInfo = DeckInfoImpl(lambda : InitDeckInfoDict(

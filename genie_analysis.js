@@ -1,3 +1,8 @@
+// img_ids_num needs to be set for this script to work, eg
+// var img_ids_num = 10
+// for tgs.  It is automatically set in compute_stats.py to the correct value before
+// being copied over to the output directory
+
 var img_ids = [
 	       "production",
 	       "dev",
@@ -9,32 +14,39 @@ var img_ids = [
 	       "discard",
 	       "4types",
 	       "alien",
-	       /*  fill in rvi goal images
-		 "",
-	       "",
-	       "",
-	       "",
-	       ""
-	       */
+	       "explore",
+	       "rebel",
+	       "4goods",
+	       "8tableau",
+	       "3uplift",
+	       "consume",
+	       "prestige",
+	       "2prestige3vp",
+	       "peacewar",
+	       "militaryinfluence"
 	       ];
 var imgs = [];
 
 var homeworld_colors = {'Alpha Centauri': '#663300',
-			'Epsilon Eridani': '#0099FF',
+			'Epsilon Eridani': '#9900FF',
 			'Old Earth': '#000099',
-			'Ancient Race': '#66FF00',
+			'Ancient Race': '#00FF00',
 			'Damaged Alien Factory': '#FFFF00',
-			"Earth's Lost Colony": '#00CCFF',
+			"Earths Lost Colony": '#00CCFF',
 			'New Sparta': '#FF0000',
 			'Separatist Colony': '#555555',
-			'Doomed world': '#000000',
+			'Doomed World': '#000000',
                         'Imperium Warlord': '#AA00AA',
-                        'Rebel Cantina': 'FF5555',
-                        'Galactic Developers': '#FF00FF'
+                        'Rebel Cantina': '#FF5555',
+                        'Galactic Developers': '#FF00FF',
+			'Rebel Freedom Fighters': '#FF0055',
+			'Uplift Mercenary Force': '#66FF00',
+			'Galactic Scavengers': '#0099FF',
+			'Alien Research Team': '#FFFF55'
 };
 
 function LoadImages() {
-    for (var i = 0; i < img_ids.length; ++i) {
+    for (var i = 0; i < img_ids_num; ++i) {
 	var new_img = new Image();
 	new_img.src = 'images/' + img_ids[i] + '.png';
 	imgs.push(new_img);
@@ -141,7 +153,7 @@ function RenderHomeworldGoalData(canvas_id, data) {
 	}
 
 	var MAX_RATE = 1.4;
-	var MIN_RATE = 0.7;
+	var MIN_RATE = 0.6;
 	var LEFTOVERS = canvas.height - imgs[0].height;
 
 	function y_coord(r) {
@@ -161,7 +173,7 @@ function RenderHomeworldGoalData(canvas_id, data) {
 	    var hw = data[i].homeworld;
 	    var hw_col = homeworld_colors[hw];
 	    context.fillStyle = hw_col;
-	    fillText(hw, canvas.width - 200, (i + 1) * 20 + 150);
+	    fillText(hw, canvas.width - 200, (i + 1) * 20 + 150 - (data.length/2*20) + 90);
 
 	    var space_per_line = (imgs[0].width / imgs.length);
 	    var cur_x = parseInt(i * space_per_line * .8 + space_per_line * .1);
