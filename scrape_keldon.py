@@ -21,7 +21,7 @@ def ReadAvailableGames():
     contents = urllib2.urlopen(list_url)
     ret = []
     for line in contents:
-        if line.find('showgame') != -1:
+        if line.find('showgame.cgi') != -1:
             ret.append( int(line.split('gid=')[1].split('"')[0]) )
             
     return ret
