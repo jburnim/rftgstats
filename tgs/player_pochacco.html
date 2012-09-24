@@ -1,0 +1,859 @@
+<html><head><title> RFTGStats.com: Race for the Galaxy Statistics Gathering Storm pochacco</title><script type="text/javascript" src="card_attrs.js"></script><script type="text/javascript" src="genie_analysis.js"></script></head><body>
+<a href="#overview">Overview</a> 
+<a href="#homeworld_flow">Homeworld Rating Flow</a> 
+<a href="#player_flow">Player Rating Flow</a> 
+<br>
+<a name="overview"><h2>Overview</h2></a><div class="h3">Total games analyzed: 95<br>
+Last seen genie game number: 128574<br>
+Last seen flex game number: 6001<br>
+<table border=1><tr><td>Player Size</td><td>Num Games</td><td>Percentage</td></tr><tr><td>2p adv</td><td>92</td><td>96%</td></tr><tr><td>3p</td><td>1</td><td>1%</td></tr><tr><td>4p</td><td>2</td><td>2%</td></tr></table border=1><table border=1><tr><td>Game Type</td><td>Num Games</td><td>Percentage</td></tr><tr><td>Gathering Storm</td><td>19</td><td>20%</td></tr><tr><td>Gathering Storm with Goals</td><td>76</td><td>80%</td></tr></table></div>
+<p>
+<table><tr><td>Skill Normalized<br>Winning Rate</td>
+   <td><canvas id="cardWinInfoCanvas" height="600" width="800"></canvas></td>
+</tr>
+<tr>
+<td></td><td><center>
+Probability instance of card appears on tableau</center></td>
+</tr>
+</table>
+<script type="text/javascript">
+  var cardWinInfo = {
+  "New Earth": {
+    "prob_per_card_ssd": 0.017941928973195586,
+    "win_points": 0.6666666666666666,
+    "prob_per_card": 0.031578947368421054,
+    "norm_win_points_ssd": 0.5267288153557337,
+    "norm_win_points": 0.5267288153557337
+  },
+  "Galactic Survey SETI": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 1.7142857142857142,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.26214961308981205,
+    "norm_win_points": 1.5343298157836514
+  },
+  "Rebel Base": {
+    "prob_per_card_ssd": 0.024956588639444353,
+    "win_points": 2.0,
+    "prob_per_card": 0.06315789473684211,
+    "norm_win_points_ssd": 0.13916731127206805,
+    "norm_win_points": 2.1958324134306513
+  },
+  "Galactic Bazaar": {
+    "prob_per_card_ssd": 0.030045889963816068,
+    "win_points": 0.8888888888888888,
+    "prob_per_card": 0.09473684210526316,
+    "norm_win_points_ssd": 0.425058115892368,
+    "norm_win_points": 0.9538351707100533
+  },
+  "Export Duties": {
+    "prob_per_card_ssd": 0.01641423254920334,
+    "win_points": 0.7272727272727273,
+    "prob_per_card": 0.05789473684210526,
+    "norm_win_points_ssd": 0.39992770762170293,
+    "norm_win_points": 0.785771724460027
+  },
+  "Terraforming Guild": {
+    "prob_per_card_ssd": 0.03526088387259871,
+    "win_points": 1.3846153846153846,
+    "prob_per_card": 0.1368421052631579,
+    "norm_win_points_ssd": 0.3327690517235339,
+    "norm_win_points": 1.5376489826365498
+  },
+  "Reptilian Uplift Race": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 1.4285714285714286,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.3577251042963751,
+    "norm_win_points": 1.3079763054401339
+  },
+  "New Vinland": {
+    "prob_per_card_ssd": 0.03282846509840668,
+    "win_points": 1.5454545454545454,
+    "prob_per_card": 0.11578947368421053,
+    "norm_win_points_ssd": 0.24353866818624906,
+    "norm_win_points": 1.2239868431381997
+  },
+  "Aquatic Uplift Race": {
+    "prob_per_card_ssd": 0.030045889963816068,
+    "win_points": 1.5555555555555556,
+    "prob_per_card": 0.09473684210526316,
+    "norm_win_points_ssd": 0.4342036668836189,
+    "norm_win_points": 1.8140208137510443
+  },
+  "Pan Galactic League": {
+    "prob_per_card_ssd": 0.028491755700166505,
+    "win_points": 1.0,
+    "prob_per_card": 0.08421052631578947,
+    "norm_win_points_ssd": 0.5366470305503964,
+    "norm_win_points": 1.1904869807953284
+  },
+  "Alpha Centauri": {
+    "prob_per_card_ssd": 0.014728925455696273,
+    "win_points": 1.0,
+    "prob_per_card": 0.021052631578947368,
+    "norm_win_points_ssd": 0.887051970522329,
+    "norm_win_points": 0.887051970522329
+  },
+  "Alien Robot Scout Ship": {
+    "prob_per_card_ssd": 0.03282846509840668,
+    "win_points": 1.2727272727272727,
+    "prob_per_card": 0.11578947368421053,
+    "norm_win_points_ssd": 0.2741839807434678,
+    "norm_win_points": 1.1303522439379234
+  },
+  "Star Nomad Lair": {
+    "prob_per_card_ssd": 0.03526088387259871,
+    "win_points": 1.0769230769230769,
+    "prob_per_card": 0.1368421052631579,
+    "norm_win_points_ssd": 0.27051259510619374,
+    "norm_win_points": 0.9984342189857572
+  },
+  "Last Uplift Gnarssh": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 0.8571428571428571,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.504689497257581,
+    "norm_win_points": 0.9999160816702395
+  },
+  "Volcanic World": {
+    "prob_per_card_ssd": 0.028491755700166505,
+    "win_points": 1.75,
+    "prob_per_card": 0.08421052631578947,
+    "norm_win_points_ssd": 0.224346585969618,
+    "norm_win_points": 1.4947179953608614
+  },
+  "Space Marines": {
+    "prob_per_card_ssd": 0.021640005502975946,
+    "win_points": 1.3636363636363635,
+    "prob_per_card": 0.11578947368421053,
+    "norm_win_points_ssd": 0.20497377711005968,
+    "norm_win_points": 1.3186496391446438
+  },
+  "Galactic Studios": {
+    "prob_per_card_ssd": 0.030045889963816068,
+    "win_points": 0.8888888888888888,
+    "prob_per_card": 0.09473684210526316,
+    "norm_win_points_ssd": 0.3370194037863532,
+    "norm_win_points": 0.829177086680568
+  },
+  "Rebel Underground": {
+    "prob_per_card_ssd": 0.028491755700166505,
+    "win_points": 1.25,
+    "prob_per_card": 0.08421052631578947,
+    "norm_win_points_ssd": 0.3604662598962359,
+    "norm_win_points": 1.1604960014211865
+  },
+  "Outlaw World": {
+    "prob_per_card_ssd": 0.014728925455696273,
+    "win_points": 1.0,
+    "prob_per_card": 0.021052631578947368,
+    "norm_win_points_ssd": 0.7646581636061732,
+    "norm_win_points": 0.7646581636061732
+  },
+  "Drop Ships": {
+    "prob_per_card_ssd": 0.020103247132465682,
+    "win_points": 1.2222222222222223,
+    "prob_per_card": 0.09473684210526316,
+    "norm_win_points_ssd": 0.25319454944704284,
+    "norm_win_points": 1.2230491629762663
+  },
+  "Malevolent Lifeforms": {
+    "prob_per_card_ssd": 0.030045889963816068,
+    "win_points": 1.3333333333333333,
+    "prob_per_card": 0.09473684210526316,
+    "norm_win_points_ssd": 0.3458837446025494,
+    "norm_win_points": 1.3053243885774704
+  },
+  "Pirate World": {
+    "prob_per_card_ssd": 0.014728925455696273,
+    "win_points": 0.0,
+    "prob_per_card": 0.021052631578947368,
+    "norm_win_points_ssd": 0.0,
+    "norm_win_points": 0.0
+  },
+  "Research Labs": {
+    "prob_per_card_ssd": 0.017630441936299354,
+    "win_points": 0.9230769230769231,
+    "prob_per_card": 0.06842105263157895,
+    "norm_win_points_ssd": 0.3336055138267323,
+    "norm_win_points": 0.9599936325152212
+  },
+  "Lost Alien Warship": {
+    "prob_per_card_ssd": 0.03636814243973279,
+    "win_points": 0.7142857142857143,
+    "prob_per_card": 0.14736842105263157,
+    "norm_win_points_ssd": 0.31867005440564566,
+    "norm_win_points": 0.8176139719851357
+  },
+  "Mining League": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 1.7142857142857142,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.40242559062199457,
+    "norm_win_points": 1.7836722840394141
+  },
+  "Improved Logistics": {
+    "prob_per_card_ssd": 0.021286786465525207,
+    "win_points": 1.0476190476190477,
+    "prob_per_card": 0.11052631578947368,
+    "norm_win_points_ssd": 0.20650629002384732,
+    "norm_win_points": 0.932200556080556
+  },
+  "Alien Rosetta Stone World": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 0.5714285714285714,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.3422180690149914,
+    "norm_win_points": 0.5301607883503235
+  },
+  "Diversified Economy": {
+    "prob_per_card_ssd": 0.018705754034497653,
+    "win_points": 0.9333333333333333,
+    "prob_per_card": 0.07894736842105263,
+    "norm_win_points_ssd": 0.21816729950555,
+    "norm_win_points": 0.7474127432819189
+  },
+  "Imperium Lords": {
+    "prob_per_card_ssd": 0.028491755700166505,
+    "win_points": 1.0,
+    "prob_per_card": 0.08421052631578947,
+    "norm_win_points_ssd": 0.468511434361764,
+    "norm_win_points": 1.1802396014429029
+  },
+  "Genetics Lab": {
+    "prob_per_card_ssd": 0.008970964486597793,
+    "win_points": 1.3333333333333333,
+    "prob_per_card": 0.015789473684210527,
+    "norm_win_points_ssd": 0.5937681599691199,
+    "norm_win_points": 1.1421149598160694
+  },
+  "Investment Credits": {
+    "prob_per_card_ssd": 0.0236241158189805,
+    "win_points": 1.2413793103448276,
+    "prob_per_card": 0.15263157894736842,
+    "norm_win_points_ssd": 0.2198209818522738,
+    "norm_win_points": 1.2387495285111214
+  },
+  "Gem World": {
+    "prob_per_card_ssd": 0.031486475874532564,
+    "win_points": 0.4,
+    "prob_per_card": 0.10526315789473684,
+    "norm_win_points_ssd": 0.17639871899186788,
+    "norm_win_points": 0.2640311140035223
+  },
+  "Alien Tech Institute": {
+    "prob_per_card_ssd": 0.030045889963816068,
+    "win_points": 0.4444444444444444,
+    "prob_per_card": 0.09473684210526316,
+    "norm_win_points_ssd": 0.2929353440455527,
+    "norm_win_points": 0.4425858086578228
+  },
+  "Rebel Miners": {
+    "prob_per_card_ssd": 0.031486475874532564,
+    "win_points": 1.2,
+    "prob_per_card": 0.10526315789473684,
+    "norm_win_points_ssd": 0.29444782003229314,
+    "norm_win_points": 1.0615249296130362
+  },
+  "Deserted Alien Library": {
+    "prob_per_card_ssd": 0.024956588639444353,
+    "win_points": 1.3333333333333333,
+    "prob_per_card": 0.06315789473684211,
+    "norm_win_points_ssd": 0.41628861184195104,
+    "norm_win_points": 1.2897512868402439
+  },
+  "Blaster Gem Mines": {
+    "prob_per_card_ssd": 0.02060465199703549,
+    "win_points": 1.5,
+    "prob_per_card": 0.042105263157894736,
+    "norm_win_points_ssd": 0.45951675759425986,
+    "norm_win_points": 1.376685791364899
+  },
+  "Comet Zone": {
+    "prob_per_card_ssd": 0.030045889963816068,
+    "win_points": 1.2222222222222223,
+    "prob_per_card": 0.09473684210526316,
+    "norm_win_points_ssd": 0.2951874739519697,
+    "norm_win_points": 0.9210091674616149
+  },
+  "Distant World": {
+    "prob_per_card_ssd": 0.022909776319263525,
+    "win_points": 1.2,
+    "prob_per_card": 0.05263157894736842,
+    "norm_win_points_ssd": 0.47698991947673464,
+    "norm_win_points": 1.1597898092937027
+  },
+  "Deficit Spending": {
+    "prob_per_card_ssd": 0.015743237937266282,
+    "win_points": 1.4,
+    "prob_per_card": 0.05263157894736842,
+    "norm_win_points_ssd": 0.40788403432303616,
+    "norm_win_points": 1.4372724160212067
+  },
+  "Rebel Outpost": {
+    "prob_per_card_ssd": 0.022909776319263525,
+    "win_points": 1.2,
+    "prob_per_card": 0.05263157894736842,
+    "norm_win_points_ssd": 0.5182962730078903,
+    "norm_win_points": 1.2581838186483316
+  },
+  "Spice World": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 1.1428571428571428,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.3604471720451536,
+    "norm_win_points": 0.9753643662572784
+  },
+  "Galactic Trendsetters": {
+    "prob_per_card_ssd": 0.017941928973195586,
+    "win_points": 1.3333333333333333,
+    "prob_per_card": 0.031578947368421054,
+    "norm_win_points_ssd": 1.07680352046846,
+    "norm_win_points": 2.0775424431237397
+  },
+  "Consumer Markets": {
+    "prob_per_card_ssd": 0.01340216475497712,
+    "win_points": 1.1428571428571428,
+    "prob_per_card": 0.03684210526315789,
+    "norm_win_points_ssd": 0.3658594586328962,
+    "norm_win_points": 1.0052694391118433
+  },
+  "New Sparta": {
+    "prob_per_card_ssd": 0.010470767561154526,
+    "win_points": 2.0,
+    "prob_per_card": 0.010526315789473684,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.4998938201589167
+  },
+  "Deserted Alien Colony": {
+    "prob_per_card_ssd": 0.02060465199703549,
+    "win_points": 1.0,
+    "prob_per_card": 0.042105263157894736,
+    "norm_win_points_ssd": 0.5557023864589593,
+    "norm_win_points": 0.9573558192522145
+  },
+  "Galactic Renaissance": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 1.1428571428571428,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.5283126983275699,
+    "norm_win_points": 1.282849262284327
+  },
+  "Smuggling Lair": {
+    "prob_per_card_ssd": 0.03839618973174701,
+    "win_points": 1.625,
+    "prob_per_card": 0.16842105263157894,
+    "norm_win_points_ssd": 0.2579309243684875,
+    "norm_win_points": 1.7456069841750022
+  },
+  "Pre-Sentient Race": {
+    "prob_per_card_ssd": 0.028491755700166505,
+    "win_points": 1.25,
+    "prob_per_card": 0.08421052631578947,
+    "norm_win_points_ssd": 0.5248962640286133,
+    "norm_win_points": 1.4909299253972266
+  },
+  "Rebel Colony": {
+    "prob_per_card_ssd": 0.014728925455696273,
+    "win_points": 2.0,
+    "prob_per_card": 0.021052631578947368,
+    "norm_win_points_ssd": 0.063683197003998,
+    "norm_win_points": 1.9916361389602026
+  },
+  "Radioactive World": {
+    "prob_per_card_ssd": 0.010470767561154526,
+    "win_points": 0.0,
+    "prob_per_card": 0.010526315789473684,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 0.0
+  },
+  "Ancient Race": {
+    "prob_per_card_ssd": 0.022909776319263525,
+    "win_points": 1.2,
+    "prob_per_card": 0.05263157894736842,
+    "norm_win_points_ssd": 0.7831232509558669,
+    "norm_win_points": 1.622754893537239
+  },
+  "Terraforming Robots": {
+    "prob_per_card_ssd": 0.015022944981908034,
+    "win_points": 1.6666666666666667,
+    "prob_per_card": 0.04736842105263158,
+    "norm_win_points_ssd": 0.35823487807605076,
+    "norm_win_points": 1.583570324183051
+  },
+  "Damaged Alien Factory": {
+    "prob_per_card_ssd": 0.028491755700166505,
+    "win_points": 0.5,
+    "prob_per_card": 0.08421052631578947,
+    "norm_win_points_ssd": 0.2956251388207275,
+    "norm_win_points": 0.44440164451538955
+  },
+  "Imperium Armaments World": {
+    "prob_per_card_ssd": 0.014728925455696273,
+    "win_points": 0.0,
+    "prob_per_card": 0.021052631578947368,
+    "norm_win_points_ssd": 0.0,
+    "norm_win_points": 0.0
+  },
+  "Contact Specialist": {
+    "prob_per_card_ssd": 0.014426670335317297,
+    "win_points": 1.0909090909090908,
+    "prob_per_card": 0.07719298245614035,
+    "norm_win_points_ssd": 0.268512209738167,
+    "norm_win_points": 1.1539702195968626
+  },
+  "Lost Alien Battle Fleet": {
+    "prob_per_card_ssd": 0.034083505935820275,
+    "win_points": 1.0,
+    "prob_per_card": 0.12631578947368421,
+    "norm_win_points_ssd": 0.32142929351783,
+    "norm_win_points": 0.9834262789261978
+  },
+  "Mining Robots": {
+    "prob_per_card_ssd": 0.011454888159631763,
+    "win_points": 0.8,
+    "prob_per_card": 0.02631578947368421,
+    "norm_win_points_ssd": 0.40376194660321046,
+    "norm_win_points": 0.658460002145049
+  },
+  "Secluded World": {
+    "prob_per_card_ssd": 0.030045889963816068,
+    "win_points": 0.6666666666666666,
+    "prob_per_card": 0.09473684210526316,
+    "norm_win_points_ssd": 0.2583120504887198,
+    "norm_win_points": 0.5070811859907157
+  },
+  "Deserted Alien World": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 0.5714285714285714,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.2998333829628186,
+    "norm_win_points": 0.4627345545841329
+  },
+  "Merchant Guild": {
+    "prob_per_card_ssd": 0.034083505935820275,
+    "win_points": 0.75,
+    "prob_per_card": 0.12631578947368421,
+    "norm_win_points_ssd": 0.2602139075012731,
+    "norm_win_points": 0.6051076470118044
+  },
+  "Black Market Trading World": {
+    "prob_per_card_ssd": 0.022909776319263525,
+    "win_points": 0.4,
+    "prob_per_card": 0.05263157894736842,
+    "norm_win_points_ssd": 0.37176993469464,
+    "norm_win_points": 0.37176993469464004
+  },
+  "Refugee World": {
+    "prob_per_card_ssd": 0.017941928973195586,
+    "win_points": 2.0,
+    "prob_per_card": 0.031578947368421054,
+    "norm_win_points_ssd": 0.07399459795948278,
+    "norm_win_points": 1.562817934463314
+  },
+  "Trade League": {
+    "prob_per_card_ssd": 0.028491755700166505,
+    "win_points": 1.0,
+    "prob_per_card": 0.08421052631578947,
+    "norm_win_points_ssd": 0.3420078859406407,
+    "norm_win_points": 0.8791788793941605
+  },
+  "Public Works": {
+    "prob_per_card_ssd": 0.023137739907317257,
+    "win_points": 1.4814814814814814,
+    "prob_per_card": 0.14210526315789473,
+    "norm_win_points_ssd": 0.18602211454199624,
+    "norm_win_points": 1.4293990230567117
+  },
+  "Mining Conglomerate": {
+    "prob_per_card_ssd": 0.015743237937266282,
+    "win_points": 1.4,
+    "prob_per_card": 0.05263157894736842,
+    "norm_win_points_ssd": 0.27218869464045614,
+    "norm_win_points": 1.2167202315325008
+  },
+  "Alien Toy Shop": {
+    "prob_per_card_ssd": 0.03282846509840668,
+    "win_points": 1.0,
+    "prob_per_card": 0.11578947368421053,
+    "norm_win_points_ssd": 0.35743870856972876,
+    "norm_win_points": 0.9324300699688469
+  },
+  "Runaway Robots": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 1.1428571428571428,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.3204798418448998,
+    "norm_win_points": 0.8877697397550136
+  },
+  "Old Earth": {
+    "prob_per_card_ssd": 0.02060465199703549,
+    "win_points": 1.25,
+    "prob_per_card": 0.042105263157894736,
+    "norm_win_points_ssd": 0.509735103069533,
+    "norm_win_points": 0.8657693975648375
+  },
+  "Empath World": {
+    "prob_per_card_ssd": 0.034083505935820275,
+    "win_points": 1.1666666666666667,
+    "prob_per_card": 0.12631578947368421,
+    "norm_win_points_ssd": 0.27944825090905356,
+    "norm_win_points": 1.0769734469378422
+  },
+  "Artist Colony": {
+    "prob_per_card_ssd": 0.022909776319263525,
+    "win_points": 1.2,
+    "prob_per_card": 0.05263157894736842,
+    "norm_win_points_ssd": 0.4587805463139633,
+    "norm_win_points": 1.083932654000502
+  },
+  "Avian Uplift Race": {
+    "prob_per_card_ssd": 0.031486475874532564,
+    "win_points": 1.0,
+    "prob_per_card": 0.10526315789473684,
+    "norm_win_points_ssd": 0.3764034583041616,
+    "norm_win_points": 0.9990477013618613
+  },
+  "Space Port": {
+    "prob_per_card_ssd": 0.034083505935820275,
+    "win_points": 1.1666666666666667,
+    "prob_per_card": 0.12631578947368421,
+    "norm_win_points_ssd": 0.2525313600368005,
+    "norm_win_points": 0.9685346066128838
+  },
+  "Galactic Engineers": {
+    "prob_per_card_ssd": 0.02060465199703549,
+    "win_points": 1.0,
+    "prob_per_card": 0.042105263157894736,
+    "norm_win_points_ssd": 0.5031693383277925,
+    "norm_win_points": 0.8712274789232413
+  },
+  "Merchant World": {
+    "prob_per_card_ssd": 0.017941928973195586,
+    "win_points": 0.6666666666666666,
+    "prob_per_card": 0.031578947368421054,
+    "norm_win_points_ssd": 0.5707199508949894,
+    "norm_win_points": 0.5707199508949894
+  },
+  "Free Trade Association": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 0.8571428571428571,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.30080806206148714,
+    "norm_win_points": 0.6321102947334395
+  },
+  "New Survivalists": {
+    "prob_per_card_ssd": 0.024956588639444353,
+    "win_points": 0.3333333333333333,
+    "prob_per_card": 0.06315789473684211,
+    "norm_win_points_ssd": 0.2833100156625993,
+    "norm_win_points": 0.2833100156625993
+  },
+  "Lost Species Ark World": {
+    "prob_per_card_ssd": 0.034083505935820275,
+    "win_points": 0.8333333333333334,
+    "prob_per_card": 0.12631578947368421,
+    "norm_win_points_ssd": 0.23578652572770453,
+    "norm_win_points": 0.6509310730347138
+  },
+  "Galactic Genome Project": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 1.4285714285714286,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.5431050954197434,
+    "norm_win_points": 1.6124784220303217
+  },
+  "Hive World": {
+    "prob_per_card_ssd": 0.03282846509840668,
+    "win_points": 1.2727272727272727,
+    "prob_per_card": 0.11578947368421053,
+    "norm_win_points_ssd": 0.27938732849293246,
+    "norm_win_points": 1.1006307607747552
+  },
+  "Clandestine Uplift Lab": {
+    "prob_per_card_ssd": 0.022909776319263525,
+    "win_points": 1.2,
+    "prob_per_card": 0.05263157894736842,
+    "norm_win_points_ssd": 0.5003672205220253,
+    "norm_win_points": 1.1851123020116692
+  },
+  "Bio-hazard Mining World": {
+    "prob_per_card_ssd": 0.02060465199703549,
+    "win_points": 1.0,
+    "prob_per_card": 0.042105263157894736,
+    "norm_win_points_ssd": 0.576416686852103,
+    "norm_win_points": 0.9983821036408063
+  },
+  "Mining World": {
+    "prob_per_card_ssd": 0.030045889963816068,
+    "win_points": 0.8888888888888888,
+    "prob_per_card": 0.09473684210526316,
+    "norm_win_points_ssd": 0.43922722445432827,
+    "norm_win_points": 1.0001361095604078
+  },
+  "Deserted Alien Outpost": {
+    "prob_per_card_ssd": 0.028491755700166505,
+    "win_points": 1.375,
+    "prob_per_card": 0.08421052631578947,
+    "norm_win_points_ssd": 0.375928984569094,
+    "norm_win_points": 1.2351177013287198
+  },
+  "Plague World": {
+    "prob_per_card_ssd": 0.03636814243973279,
+    "win_points": 1.0714285714285714,
+    "prob_per_card": 0.14736842105263157,
+    "norm_win_points_ssd": 0.23179273241090753,
+    "norm_win_points": 0.8182394813480135
+  },
+  "Prosperous World": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 0.5714285714285714,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.2949833963613036,
+    "norm_win_points": 0.4555986455951461
+  },
+  "Expedition Force": {
+    "prob_per_card_ssd": 0.015022944981908034,
+    "win_points": 0.8888888888888888,
+    "prob_per_card": 0.04736842105263158,
+    "norm_win_points_ssd": 0.30719564954928785,
+    "norm_win_points": 0.7674444056721074
+  },
+  "Space Mercenaries": {
+    "prob_per_card_ssd": 0.019198094865873504,
+    "win_points": 1.125,
+    "prob_per_card": 0.08421052631578947,
+    "norm_win_points_ssd": 0.2979892564858511,
+    "norm_win_points": 1.2047739794480317
+  },
+  "New Galactic Order": {
+    "prob_per_card_ssd": 0.037411508068995306,
+    "win_points": 1.0666666666666667,
+    "prob_per_card": 0.15789473684210525,
+    "norm_win_points_ssd": 0.302244970475756,
+    "norm_win_points": 1.1405598335506097
+  },
+  "Rebel Sympathizers": {
+    "prob_per_card_ssd": 0.028491755700166505,
+    "win_points": 1.0,
+    "prob_per_card": 0.08421052631578947,
+    "norm_win_points_ssd": 0.3375435579128576,
+    "norm_win_points": 0.8633846474613265
+  },
+  "Replicant Robots": {
+    "prob_per_card_ssd": 0.008970964486597793,
+    "win_points": 2.3333333333333335,
+    "prob_per_card": 0.015789473684210527,
+    "norm_win_points_ssd": 0.6988943670201303,
+    "norm_win_points": 2.2755218009393383
+  },
+  "Earths Lost Colony": {
+    "prob_per_card_ssd": 0.030045889963816068,
+    "win_points": 0.8888888888888888,
+    "prob_per_card": 0.09473684210526316,
+    "norm_win_points_ssd": 0.2794284670828268,
+    "norm_win_points": 0.6995472094778707
+  },
+  "Pilgrimage World": {
+    "prob_per_card_ssd": 0.014728925455696273,
+    "win_points": 1.0,
+    "prob_per_card": 0.021052631578947368,
+    "norm_win_points_ssd": 0.7688376901758909,
+    "norm_win_points": 0.7688376901758909
+  },
+  "Alien Robot Sentry": {
+    "prob_per_card_ssd": 0.03526088387259871,
+    "win_points": 1.3846153846153846,
+    "prob_per_card": 0.1368421052631579,
+    "norm_win_points_ssd": 0.3042995017965157,
+    "norm_win_points": 1.3837600579335256
+  },
+  "Galactic Imperium": {
+    "prob_per_card_ssd": 0.022909776319263525,
+    "win_points": 1.6,
+    "prob_per_card": 0.05263157894736842,
+    "norm_win_points_ssd": 0.41202709525401077,
+    "norm_win_points": 1.5508952815394708
+  },
+  "Rebel Fuel Cache": {
+    "prob_per_card_ssd": 0.024956588639444353,
+    "win_points": 1.3333333333333333,
+    "prob_per_card": 0.06315789473684211,
+    "norm_win_points_ssd": 0.36922845192395815,
+    "norm_win_points": 1.1592601073896722
+  },
+  "Alien Robotic Factory": {
+    "prob_per_card_ssd": 0.034083505935820275,
+    "win_points": 0.8333333333333334,
+    "prob_per_card": 0.12631578947368421,
+    "norm_win_points_ssd": 0.34379458900390997,
+    "norm_win_points": 0.8890729302325567
+  },
+  "Tourist World": {
+    "prob_per_card_ssd": 0.014728925455696273,
+    "win_points": 1.5,
+    "prob_per_card": 0.021052631578947368,
+    "norm_win_points_ssd": 0.9881069963318158,
+    "norm_win_points": 0.9881069963318158
+  },
+  "Rebel Homeworld": {
+    "prob_per_card_ssd": 0.024956588639444353,
+    "win_points": 1.3333333333333333,
+    "prob_per_card": 0.06315789473684211,
+    "norm_win_points_ssd": 0.4353812579715439,
+    "norm_win_points": 1.3053947602273206
+  },
+  "New Economy": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 1.1428571428571428,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.39118586233930613,
+    "norm_win_points": 1.0891069139774465
+  },
+  "Rebel Warrior Race": {
+    "prob_per_card_ssd": 0.024956588639444353,
+    "win_points": 1.6666666666666667,
+    "prob_per_card": 0.06315789473684211,
+    "norm_win_points_ssd": 0.32690520042135784,
+    "norm_win_points": 1.5603828194228067
+  },
+  "Galactic Resort": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 0.8571428571428571,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.5058916321223004,
+    "norm_win_points": 0.9505677974476745
+  },
+  "Interstellar Bank": {
+    "prob_per_card_ssd": 0.02229047851165959,
+    "win_points": 1.4166666666666667,
+    "prob_per_card": 0.12631578947368421,
+    "norm_win_points_ssd": 0.23122520691324142,
+    "norm_win_points": 1.4927537523977392
+  },
+  "Former Penal Colony": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 1.7142857142857142,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.3249564205018499,
+    "norm_win_points": 1.7871569713059972
+  },
+  "Asteroid Belt": {
+    "prob_per_card_ssd": 0.02060465199703549,
+    "win_points": 1.5,
+    "prob_per_card": 0.042105263157894736,
+    "norm_win_points_ssd": 0.44480332338034695,
+    "norm_win_points": 1.328383026441583
+  },
+  "Destroyed World": {
+    "prob_per_card_ssd": 0.02680432950995424,
+    "win_points": 0.8571428571428571,
+    "prob_per_card": 0.07368421052631578,
+    "norm_win_points_ssd": 0.5264880445527392,
+    "norm_win_points": 0.9857026548048914
+  },
+  "Galactic Federation": {
+    "prob_per_card_ssd": 0.034083505935820275,
+    "win_points": 1.6666666666666667,
+    "prob_per_card": 0.12631578947368421,
+    "norm_win_points_ssd": 0.3386359173760788,
+    "norm_win_points": 1.8819133510552817
+  },
+  "Expanding Colony": {
+    "prob_per_card_ssd": 0.02060465199703549,
+    "win_points": 1.5,
+    "prob_per_card": 0.042105263157894736,
+    "norm_win_points_ssd": 0.3793424126755719,
+    "norm_win_points": 1.105892098398855
+  }
+};
+  RenderCardWinInfo(cardWinInfo,document.getElementById("cardWinInfoCanvas"));
+</script>
+</p>
+<table id="homeworld_flow_tables"><tr><td><br><a name="homeworld_flow"> <table border=1><tr><td>Homeworld</td><td>Net rating change</td><td>2 Player record</td></tr><tr><td>Epsilon Eridani</td><td>27.4</td><td><font color="green">8</font>-<font color="red">4</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Ancient Race</td><td>18.4</td><td><font color="green">4</font>-<font color="red">2</font>-<font color="#444444">0</font></td></tr>
+<tr><td>New Sparta</td><td>17.9</td><td><font color="green">7</font>-<font color="red">5</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Doomed World</td><td>1.1</td><td><font color="green">6</font>-<font color="red">6</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Alpha Centauri</td><td>0.9</td><td><font color="green">7</font>-<font color="red">6</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Damaged Alien Factory</td><td>-2.0</td><td><font color="green">4</font>-<font color="red">4</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Separatist Colony</td><td>-5.5</td><td><font color="green">4</font>-<font color="red">5</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Old Earth</td><td>-14.0</td><td><font color="green">4</font>-<font color="red">6</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Earths Lost Colony</td><td>-15.4</td><td><font color="green">5</font>-<font color="red">5</font>-<font color="#444444">0</font></td></tr>
+</table></td><td><br><table border=1><tr><td>Opponent Homeworld</td><td>Net flow against</td><td>2P rec against</td></tr><tr><td>Old Earth</td><td>37.9</td><td><font color="green">10</font>-<font color="red">3</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Ancient Race</td><td>28.7</td><td><font color="green">7</font>-<font color="red">1</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Damaged Alien Factory</td><td>16.2</td><td><font color="green">5</font>-<font color="red">3</font>-<font color="#444444">0</font></td></tr>
+<tr><td>New Sparta</td><td>5.2</td><td><font color="green">5</font>-<font color="red">5</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Epsilon Eridani</td><td>0.3</td><td><font color="green">8</font>-<font color="red">10</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Separatist Colony</td><td>-8.2</td><td><font color="green">6</font>-<font color="red">6</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Earths Lost Colony</td><td>-10.3</td><td><font color="green">4</font>-<font color="red">5</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Alpha Centauri</td><td>-13.3</td><td><font color="green">4</font>-<font color="red">6</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Doomed World</td><td>-27.7</td><td><font color="green">0</font>-<font color="red">4</font>-<font color="#444444">0</font></td></tr>
+</table></table><a name="player_flow"> <table border=1><tr><td>Opponent</td><td>Net rating flow</td><td>Record</td></tr>
+<tr><td rowspan=1><a href="player_cil.html">cil </a></td><td rowspan=1>18.2</td><td rowspan=1><font color="green">2</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125890"><font color="green">DAF-52 ELC-48</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=125907"><font color="green">NS-46 OE-45</font></a></td></tr>
+<tr><td rowspan=1><a href="player_machiavelli.html">machiavelli </a></td><td rowspan=1>16.6</td><td rowspan=1><font color="green">3</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128056"><font color="green">AR-44 OE-35</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=128053"><font color="green">AC-65 SC-49</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=126257"><font color="green">AR-55 EE-48</font></a></td></tr>
+<tr><td rowspan=1><a href="player_nocadlee.html">nocadlee </a></td><td rowspan=1>16.0</td><td rowspan=1><font color="green">3</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128365"><font color="green">EE-59 AC-54</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=125933"><font color="green">SC-35 AR-18</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=125270"><font color="green">AC-31 DAF-12</font></a></td></tr>
+<tr><td rowspan=1><a href="player_ultrawaffle.html">ultrawaffle </a></td><td rowspan=1>11.5</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125253"><font color="green">OE-41 EE-40</font></a></td></tr>
+<tr><td rowspan=1><a href="player_diffdude.html">diffdude </a></td><td rowspan=1>10.9</td><td rowspan=1><font color="green">2</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=127684"><font color="green">OE-42 SC-41</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=125354"><font color="green">ELC-54 AR-53</font></a></td></tr>
+<tr><td rowspan=1><a href="player_jsnell.html">jsnell </a></td><td rowspan=1>10.8</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125534"><font color="green">AC-43 EE-40</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Callix.html">Callix </a></td><td rowspan=1>10.3</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128116"><font color="green">SC-47 NS-41</font></a></td></tr>
+<tr><td rowspan=1><a href="player_thinspoon.html">thinspoon </a></td><td rowspan=1>10.0</td><td rowspan=1><font color="green">3</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128349"><font color="green">EE-74 OE-68</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=128105"><font color="green">NS-38 ELC-33</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=126238"><font color="red">ELC-34 AC-36</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=127770"><font color="green">AR-46 ELC-36</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Yuri.html">Yuri </a></td><td rowspan=1>8.6</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125262"><font color="green">AR-39 SC-35</font></a></td></tr>
+<tr><td rowspan=1><a href="player_slkjb.html">slkjb </a></td><td rowspan=1>8.4</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125405"><font color="green">EE-33 ELC-31</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Victim.html">Victim </a></td><td rowspan=1>8.3</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128469"><font color="green">DW-57 AC-33</font></a></td></tr>
+<tr><td rowspan=1><a href="player_davecain.html">davecain </a></td><td rowspan=1>8.0</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125436"><font color="green">NS-61 DAF-43</font></a></td></tr>
+<tr><td rowspan=1><a href="player_yaxes.html">yaxes </a></td><td rowspan=1>7.8</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125249"><font color="green">DAF-35 EE-34</font></a></td></tr>
+<tr><td rowspan=1><a href="player_jollyboy42.html">jollyboy42 </a></td><td rowspan=1>7.7</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128073"><font color="green">EE-47 NS-31</font></a></td></tr>
+<tr><td rowspan=1><a href="player_dagda.html">dagda </a></td><td rowspan=1>7.5</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128059"><font color="green">ELC-37 AC-26</font></a></td></tr>
+<tr><td rowspan=1><a href="player_jett.html">jett </a></td><td rowspan=1>7.2</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128435"><font color="green">DAF-43 EE-13</font></a></td></tr>
+<tr><td rowspan=1><a href="player_suma.html">suma </a></td><td rowspan=1>7.1</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125581"><font color="green">SC-53 EE-47</font></a></td></tr>
+<tr><td rowspan=1><a href="player_rumblefish.html">rumblefish </a></td><td rowspan=1>6.9</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125276"><font color="green">NS-45 EE-39</font></a></td></tr>
+<tr><td rowspan=1><a href="player_pipiol.html">pipiol </a></td><td rowspan=1>6.9</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=126218"><font color="green">DW-39 DAF-33</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Racer81.html">Racer81 </a></td><td rowspan=1>6.6</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128574"><font color="green">SC-47 OE-20</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Deliverance.html">Deliverance </a></td><td rowspan=1>6.4</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/6001"><font color="green">NS-54 OE-46</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Gemini6Ice.html">Gemini6Ice </a></td><td rowspan=1>6.2</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=126966"><font color="green">DW-33 OE-32</font></a></td></tr>
+<tr><td rowspan=1><a href="player_ioiioi.html">ioiioi </a></td><td rowspan=1>6.2</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128148"><font color="green">OE-66 EE-41</font></a></td></tr>
+<tr><td rowspan=1><a href="player_pirikou.html">pirikou </a></td><td rowspan=1>6.2</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125283"><font color="green">ELC-35 SC-35</font></a></td></tr>
+<tr><td rowspan=1><a href="player_jcallenback.html">jcallenback </a></td><td rowspan=1>5.6</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128443"><font color="green">DW-37 AR-34</font></a></td></tr>
+<tr><td rowspan=1><a href="player_tiballagher.html">tiballagher </a></td><td rowspan=1>5.2</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128270"><font color="green">NS-56 DAF-50</font></a></td></tr>
+<tr><td rowspan=1><a href="player_PaulY.html">PaulY </a></td><td rowspan=1>5.2</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125847"><font color="green">EE-44 OE-24</font></a></td></tr>
+<tr><td rowspan=1><a href="player_joshleslie.html">joshleslie </a></td><td rowspan=1>5.0</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125568"><font color="green">AC-39 AR-34</font></a></td></tr>
+<tr><td rowspan=1><a href="player_stever.html">stever </a></td><td rowspan=1>4.9</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125404"><font color="green">DAF-65 AC-42</font></a></td></tr>
+<tr><td rowspan=1><a href="player_hulaohu.html">hulaohu </a></td><td rowspan=1>4.5</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125580"><font color="green">DW-45 OE-36</font></a></td></tr>
+<tr><td rowspan=1><a href="player_donutcow11.html">donutcow11 </a></td><td rowspan=1>4.3</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125341"><font color="green">AR-46 NS-42</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Ellelarondelle.html">Ellelarondelle </a></td><td rowspan=1>3.9</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=126257"><font color="green">AR-55 AC-28</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Sjeezel.html">Sjeezel </a></td><td rowspan=1>3.3</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128341"><font color="green">EE-49 SC-34</font></a></td></tr>
+<tr><td rowspan=1><a href="player_prionus.html">prionus </a></td><td rowspan=1>2.9</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125308"><font color="green">AC-60 AR-41</font></a></td></tr>
+<tr><td rowspan=1><a href="player_KieranMcKinnon.html">KieranMcKinnon </a></td><td rowspan=1>1.0</td><td rowspan=1><font color="green">1</font>-<font color="red">2</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128119"><font color="red">NS-32 SC-49</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=125958"><font color="red">DW-26 EE-36</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=125261"><font color="green">EE-53 NS-40</font></a></td></tr>
+<tr><td rowspan=1><a href="player_3green.html">3green </a></td><td rowspan=1>0.6</td><td rowspan=1><font color="green">1</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128144"><font color="red">DW-57 NS-58</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=126233"><font color="green">OE-32 NS-32</font></a></td></tr>
+<tr><td rowspan=1><a href="player_sheldortheconquerer.html">sheldortheconquerer </a></td><td rowspan=1>-2.5</td><td rowspan=1><font color="green">1</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128253"><font color="green">ELC-38 SC-34</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=128076"><font color="red">OE-42 SC-59</font></a></td></tr>
+<tr><td rowspan=1><a href="player_veskit.html">veskit </a></td><td rowspan=1>-2.9</td><td rowspan=1><font color="green">1</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125531"><font color="green">AC-48 OE-23</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=125532"><font color="red">AC-28 DW-43</font></a></td></tr>
+<tr><td rowspan=1><a href="player_soccerboyoc99.html">soccerboyoc99 </a></td><td rowspan=1>-4.8</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125794"><font color="red">DW-36 DAF-56</font></a></td></tr>
+<tr><td rowspan=1><a href="player_pirate_roberts.html">pirate_roberts </a></td><td rowspan=1>-4.9</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125559"><font color="red">SC-42 DW-47</font></a></td></tr>
+<tr><td rowspan=1><a href="player_hgfdsa.html">hgfdsa </a></td><td rowspan=1>-5.7</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125325"><font color="red">AR-21 SC-34</font></a></td></tr>
+<tr><td rowspan=1><a href="player_ohlishit.html">ohlishit </a></td><td rowspan=1>-5.8</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=127980"><font color="red">AC-35 EE-49</font></a></td></tr>
+<tr><td rowspan=1><a href="player_rrenaud.html">rrenaud </a></td><td rowspan=1>-5.9</td><td rowspan=1><font color="green">0</font>-<font color="red">2</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=126177"><font color="red">OE-41 DAF-59</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=125547"><font color="red">AR-36 AC-51</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Highway.html">Highway </a></td><td rowspan=1>-6.4</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=127946"><font color="red">DAF-51 EE-54</font></a></td></tr>
+<tr><td rowspan=1><a href="player_davidoux.html">davidoux </a></td><td rowspan=1>-6.5</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125284"><font color="red">ELC-54 OE-55</font></a></td></tr>
+<tr><td rowspan=1><a href="player_unlying.html">unlying </a></td><td rowspan=1>-6.9</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125239"><font color="red">DW-17 NS-42</font></a></td></tr>
+<tr><td rowspan=1><a href="player_thecesspit.html">thecesspit </a></td><td rowspan=1>-7.1</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125876"><font color="red">AC-43 NS-49</font></a></td></tr>
+<tr><td rowspan=1><a href="player_bmac.html">bmac </a></td><td rowspan=1>-7.2</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128047"><font color="red">SC-23 NS-36</font></a></td></tr>
+<tr><td rowspan=1><a href="player_ethnb.html">ethnb </a></td><td rowspan=1>-7.2</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=126710"><font color="red">OE-26 EE-55</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Psychowerks.html">Psychowerks </a></td><td rowspan=1>-7.3</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125931"><font color="red">AC-38 EE-41</font></a></td></tr>
+<tr><td rowspan=1><a href="player_raistlin.html">raistlin </a></td><td rowspan=1>-7.4</td><td rowspan=1><font color="green">0</font>-<font color="red">2</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128460"><font color="red">EE-36 OE-38</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=125420"><font color="red">NS-33 SC-70</font></a></td></tr>
+<tr><td rowspan=1><a href="player_TaxpayersMoney.html">TaxpayersMoney </a></td><td rowspan=1>-7.4</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128154"><font color="red">SC-32 OE-45</font></a></td></tr>
+<tr><td rowspan=1><a href="player_bastardchan.html">bastardchan </a></td><td rowspan=1>-7.5</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125373"><font color="red">EE-33 ELC-43</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Yodafan.html">Yodafan </a></td><td rowspan=1>-8.1</td><td rowspan=1><font color="green">4</font>-<font color="red">5</font>-<font color="#444444">1</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128301"><font color="red">NS-58 DW-62</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=128115"><font color="red">DW-42 AC-52</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=128064"><font color="red">DAF-31 ELC-50</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=126176"><font color="green">ELC-45 DAF-21</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=125573"><font color="red">NS-50 AC-52</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=125814"><font color="green">DW-56 OE-37</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=125833"><font color="#444444">ELC-29 DAF-38</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=128048"><font color="red">EE-30 AC-40</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=128055"><font color="green">NS-47 AR-30</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=128072"><font color="green">AC-72 EE-46</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Inkblot.html">Inkblot </a></td><td rowspan=1>-8.1</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=127702"><font color="red">NS-36 AC-59</font></a></td></tr>
+<tr><td rowspan=1><a href="player_WAR.html">WAR (war)</a></td><td rowspan=1>-8.3</td><td rowspan=1><font color="green">1</font>-<font color="red">2</font>-<font color="#444444">1</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128156"><font color="red">OE-29 EE-56</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=128091"><font color="green">EE-49 AR-37</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=127676"><font color="red">DAF-31 ELC-32</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=127677"><font color="#444444">AR-34 SC-23</font></a></td></tr>
+<tr><td rowspan=1><a href="player_lemonberri.html">lemonberri </a></td><td rowspan=1>-8.4</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125924"><font color="red">SC-55 EE-60</font></a></td></tr>
+<tr><td rowspan=1><a href="player_halik.html">halik </a></td><td rowspan=1>-8.5</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125946"><font color="red">OE-12 SC-23</font></a></td></tr>
+<tr><td rowspan=1><a href="player_andreus.html">andreus </a></td><td rowspan=1>-8.9</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125329"><font color="red">EE-32 ELC-36</font></a></td></tr>
+<tr><td rowspan=1><a href="player_DrDipsomania.html">DrDipsomania </a></td><td rowspan=1>-9.3</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125244"><font color="red">OE-51 EE-56</font></a></td></tr>
+<tr><td rowspan=1><a href="player_drakov666.html">drakov666 </a></td><td rowspan=1>-10.0</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125317"><font color="red">ELC-47 AR-63</font></a></td></tr>
+<tr><td rowspan=1><a href="player_lamsen.html">lamsen </a></td><td rowspan=1>-10.3</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=126222"><font color="red">DAF-37 ELC-41</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Join.html">Join </a></td><td rowspan=1>-12.9</td><td rowspan=1><font color="green">0</font>-<font color="red">2</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125833"><font color="red">ELC-29 SC-55</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=127677"><font color="red">AR-34 OE-37</font></a></td></tr>
+<tr><td rowspan=1><a href="player_blackrook.html">blackrook </a></td><td rowspan=1>-13.2</td><td rowspan=1><font color="green">0</font>-<font color="red">2</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=128093"><font color="red">AC-41 EE-44</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=125897"><font color="red">ELC-50 SC-60</font></a></td></tr>
+<tr><td rowspan=1><a href="player_OMG20100507.html">OMG20100507 </a></td><td rowspan=1>-14.1</td><td rowspan=1><font color="green">0</font>-<font color="red">2</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125396"><font color="red">SC-42 DAF-64</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=125361"><font color="red">AC-44 DW-59</font></a></td></tr>
+<tr><td rowspan=1><a href="player_svek.html">svek </a></td><td rowspan=1>-14.6</td><td rowspan=1><font color="green">0</font>-<font color="red">2</font>-<font color="#444444">0</font></td><td><a href="http://genie.game-host.org/game.htm?gid=125379"><font color="red">ELC-54 EE-60</font></a></td><td><a href="http://genie.game-host.org/game.htm?gid=128161"><font color="red">DW-52 NS-67</font></a></td></tr>
+</table></html>

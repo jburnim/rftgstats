@@ -1,0 +1,897 @@
+<html><head><title> RFTGStats.com: Race for the Galaxy Statistics Rebel vs. Imperium fix</title><script type="text/javascript" src="card_attrs.js"></script><script type="text/javascript" src="genie_analysis.js"></script></head><body>
+<a href="#overview">Overview</a> 
+<a href="#homeworld_flow">Homeworld Rating Flow</a> 
+<a href="#player_flow">Player Rating Flow</a> 
+<br>
+<a name="overview"><h2>Overview</h2></a><div class="h3">Total games analyzed: 31<br>
+Last seen flex game number: 13647<br>
+<table border=1><tr><td>Player Size</td><td>Num Games</td><td>Percentage</td></tr><tr><td>2p adv</td><td>28</td><td>90%</td></tr><tr><td>3p</td><td>1</td><td>3%</td></tr><tr><td>4p</td><td>2</td><td>6%</td></tr></table border=1><table border=1><tr><td>Game Type</td><td>Num Games</td><td>Percentage</td></tr><tr><td>Rebel vs Imperium</td><td>1</td><td>3%</td></tr><tr><td>Rebel vs Imperium with Goals</td><td>30</td><td>96%</td></tr></table></div>
+<p>
+<table><tr><td>Skill Normalized<br>Winning Rate</td>
+   <td><canvas id="cardWinInfoCanvas" height="600" width="800"></canvas></td>
+</tr>
+<tr>
+<td></td><td><center>
+Probability instance of card appears on tableau</center></td>
+</tr>
+</table>
+<script type="text/javascript">
+  var cardWinInfo = {
+  "New Earth": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 0.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 0.0
+  },
+  "Galactic Survey SETI": {
+    "prob_per_card_ssd": 0.06605856502852811,
+    "win_points": 1.2,
+    "prob_per_card": 0.16129032258064516,
+    "norm_win_points_ssd": 0.38640889806294104,
+    "norm_win_points": 0.9236251465060097
+  },
+  "Rebel Base": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 0.6666666666666666,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.51315141006243,
+    "norm_win_points": 0.51315141006243
+  },
+  "Galactic Bazaar": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.4334962442076828
+  },
+  "Export Duties": {
+    "prob_per_card_ssd": 0.022061826271710917,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 0.05888664310149913,
+    "norm_win_points": 1.6151471066028282
+  },
+  "Terraforming Guild": {
+    "prob_per_card_ssd": 0.06021009840370212,
+    "win_points": 1.5,
+    "prob_per_card": 0.12903225806451613,
+    "norm_win_points_ssd": 0.6758574522048536,
+    "norm_win_points": 1.7766342599215699
+  },
+  "Reptilian Uplift Race": {
+    "prob_per_card_ssd": 0.06605856502852811,
+    "win_points": 1.6,
+    "prob_per_card": 0.16129032258064516,
+    "norm_win_points_ssd": 0.36112069437887556,
+    "norm_win_points": 1.443247881934841
+  },
+  "New Vinland": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.4867203619005131,
+    "norm_win_points": 2.160754111604844
+  },
+  "Aquatic Uplift Race": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 2.0,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.0834671915777849,
+    "norm_win_points": 1.8363544883241458
+  },
+  "Alien Uplift Center": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.841740172569894
+  },
+  "Alpha Centauri": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 3.2866410618167206
+  },
+  "Alien Robot Scout Ship": {
+    "prob_per_card_ssd": 0.06605856502852811,
+    "win_points": 1.2,
+    "prob_per_card": 0.16129032258064516,
+    "norm_win_points_ssd": 0.43196040925144435,
+    "norm_win_points": 1.0454107990457149
+  },
+  "Star Nomad Lair": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.899635673703377,
+    "norm_win_points": 0.899635673703377
+  },
+  "Imperium Troops": {
+    "prob_per_card_ssd": 0.03754759324176631,
+    "win_points": 1.4285714285714286,
+    "prob_per_card": 0.11290322580645161,
+    "norm_win_points_ssd": 0.37311439936567237,
+    "norm_win_points": 1.373640811004948
+  },
+  "Galactic Studios": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.5456070050020168,
+    "norm_win_points": 2.1018674685033405
+  },
+  "Last Uplift Gnarssh": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.9602506280069388,
+    "norm_win_points": 0.9602506280069388
+  },
+  "Alien Data Repository": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.5394542301872902
+  },
+  "Alien Monolith": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 0.6666666666666666,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.51315141006243,
+    "norm_win_points": 0.51315141006243
+  },
+  "Rebel Underground": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 2.0,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.28198715916106476,
+    "norm_win_points": 1.9599792271941994
+  },
+  "Galactic Genome Project": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.8227841398178326
+  },
+  "Drop Ships": {
+    "prob_per_card_ssd": 0.03754759324176631,
+    "win_points": 2.0,
+    "prob_per_card": 0.11290322580645161,
+    "norm_win_points_ssd": 0.4004411500560997,
+    "norm_win_points": 1.6919827019017661
+  },
+  "Outlaw World": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.5471675495050499,
+    "norm_win_points": 2.1003069240003067
+  },
+  "Malevolent Lifeforms": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.978155805299665
+  },
+  "Pirate World": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 2.0,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.10933923194284799,
+    "norm_win_points": 1.8914106861906417
+  },
+  "Rebel Pact": {
+    "prob_per_card_ssd": 0.03010504920185106,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.8207003265240651,
+    "norm_win_points": 2.151715857695265
+  },
+  "Research Labs": {
+    "prob_per_card_ssd": 0.01770010519899143,
+    "win_points": 2.6666666666666665,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 0.6548316621669218,
+    "norm_win_points": 2.260422199658745
+  },
+  "Galactic Advertisers": {
+    "prob_per_card_ssd": 0.026550157798487146,
+    "win_points": 1.3333333333333333,
+    "prob_per_card": 0.04838709677419355,
+    "norm_win_points_ssd": 0.4989693754458095,
+    "norm_win_points": 0.9955452062343132
+  },
+  "Lost Alien Warship": {
+    "prob_per_card_ssd": 0.06021009840370212,
+    "win_points": 1.0,
+    "prob_per_card": 0.12903225806451613,
+    "norm_win_points_ssd": 0.4351712923058249,
+    "norm_win_points": 0.7387206244327289
+  },
+  "Mining League": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.7765696872476284,
+    "norm_win_points": 0.7765696872476284
+  },
+  "Improved Logistics": {
+    "prob_per_card_ssd": 0.022061826271710917,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 0.09078273191221053,
+    "norm_win_points": 1.5983847551906694
+  },
+  "Alien Rosetta Stone World": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 2.0,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 1.0340383546856486,
+    "norm_win_points": 1.691793547454358
+  },
+  "Rebel Stronghold": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.7670986559684977,
+    "norm_win_points": 2.519542405848223
+  },
+  "Expedition Force": {
+    "prob_per_card_ssd": 0.033029282514264055,
+    "win_points": 1.2,
+    "prob_per_card": 0.08064516129032258,
+    "norm_win_points_ssd": 0.45786667734724823,
+    "norm_win_points": 1.1145381622035748
+  },
+  "Insect Uplift Race": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 0.0,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.0,
+    "norm_win_points": 0.0
+  },
+  "Investment Credits": {
+    "prob_per_card_ssd": 0.03754759324176631,
+    "win_points": 1.1428571428571428,
+    "prob_per_card": 0.11290322580645161,
+    "norm_win_points_ssd": 0.5181231573196603,
+    "norm_win_points": 1.3840912512799621
+  },
+  "Gem World": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.7538010116392302,
+    "norm_win_points": 0.7538010116392302
+  },
+  "Alien Tech Institute": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.5076020232784604
+  },
+  "Smuggling World": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 1.3333333333333333,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.5490436275863259,
+    "norm_win_points": 1.0775891972048124
+  },
+  "Rebel Alliance": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 2.0,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.5175731507183999,
+    "norm_win_points": 2.296886202486393
+  },
+  "Deserted Alien Library": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.20644961636770978,
+    "norm_win_points": 1.714051639646169
+  },
+  "Imperium Blaster Gem Consortium": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.8383120989150161,
+    "norm_win_points": 0.8383120989150161
+  },
+  "Blaster Gem Mines": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 0.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 0.0
+  },
+  "Trading Outpost": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 4.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 3.5677786190846135
+  },
+  "Galactic Developers": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.6766241978300322
+  },
+  "Comet Zone": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.07307997099389751,
+    "norm_win_points": 1.7497041688239325
+  },
+  "Deficit Spending": {
+    "prob_per_card_ssd": 0.026550157798487146,
+    "win_points": 2.0,
+    "prob_per_card": 0.04838709677419355,
+    "norm_win_points_ssd": 0.06944217899821975,
+    "norm_win_points": 1.55459681913778
+  },
+  "Distant World": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.799271347406754
+  },
+  "Rebel Outpost": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 1.3333333333333333,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.7545293453197734,
+    "norm_win_points": 1.472065155043943
+  },
+  "Imperium Seat": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 2.4956942091179517
+  },
+  "Spice World": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.4334962442076828
+  },
+  "Devolved Uplift Race": {
+    "prob_per_card_ssd": 0.06605856502852811,
+    "win_points": 1.6,
+    "prob_per_card": 0.16129032258064516,
+    "norm_win_points_ssd": 0.43666986818247405,
+    "norm_win_points": 1.5977663031224463
+  },
+  "Tourist World": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.7765696872476284,
+    "norm_win_points": 0.7765696872476284
+  },
+  "Rebel Convict Mines": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.8735934158147148,
+    "norm_win_points": 2.4130476460020054
+  },
+  "Deserted Alien Colony": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 0.6666666666666666,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.6139133908566313,
+    "norm_win_points": 0.6139133908566313
+  },
+  "Blaster Runners": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 1.7838893095423067,
+    "norm_win_points": 1.7838893095423067
+  },
+  "Smuggling Lair": {
+    "prob_per_card_ssd": 0.06021009840370212,
+    "win_points": 1.5,
+    "prob_per_card": 0.12903225806451613,
+    "norm_win_points_ssd": 0.4073410292255555,
+    "norm_win_points": 1.1699322938242023
+  },
+  "Pre-Sentient Race": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.9113920699089163,
+    "norm_win_points": 0.9113920699089163
+  },
+  "Hidden Fortress": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 2.0,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.07801514665702347,
+    "norm_win_points": 1.70106055059055
+  },
+  "Space Marines": {
+    "prob_per_card_ssd": 0.033029282514264055,
+    "win_points": 2.0,
+    "prob_per_card": 0.08064516129032258,
+    "norm_win_points_ssd": 0.1770849162669117,
+    "norm_win_points": 1.805979810156621
+  },
+  "Terraforming Robots": {
+    "prob_per_card_ssd": 0.033029282514264055,
+    "win_points": 1.6,
+    "prob_per_card": 0.08064516129032258,
+    "norm_win_points_ssd": 0.5239902033801344,
+    "norm_win_points": 1.7166131664287376
+  },
+  "Damaged Alien Factory": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.5076020232784604
+  },
+  "Imperium Armaments World": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.12156397681117463,
+    "norm_win_points": 1.5550602210188575
+  },
+  "Contact Specialist": {
+    "prob_per_card_ssd": 0.014707884181140612,
+    "win_points": 2.0,
+    "prob_per_card": 0.02150537634408602,
+    "norm_win_points_ssd": 0.7436848572049825,
+    "norm_win_points": 2.5429562046117375
+  },
+  "Lost Alien Battle Fleet": {
+    "prob_per_card_ssd": 0.06021009840370212,
+    "win_points": 1.5,
+    "prob_per_card": 0.12903225806451613,
+    "norm_win_points_ssd": 0.4194868024948405,
+    "norm_win_points": 1.2534713072703703
+  },
+  "Galactic Exchange": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.16859360949944682,
+    "norm_win_points": 1.676195632777908
+  },
+  "Mining Robots": {
+    "prob_per_card_ssd": 0.022061826271710917,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 0.8651902991576979,
+    "norm_win_points": 2.4214507626590227
+  },
+  "Secluded World": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.6328575053140185,
+    "norm_win_points": 0.6328575053140185
+  },
+  "Deserted Alien World": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.06858498382136999,
+    "norm_win_points": 1.6080392140086612
+  },
+  "Galactic Bankers": {
+    "prob_per_card_ssd": 0.07095828146194513,
+    "win_points": 1.6666666666666667,
+    "prob_per_card": 0.1935483870967742,
+    "norm_win_points_ssd": 0.5513318643747593,
+    "norm_win_points": 1.4570770627629164
+  },
+  "Merchant Guild": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.5076020232784604
+  },
+  "Black Market Trading World": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.5531393744952569
+  },
+  "Pan-Galactic Research": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.09965218769223332,
+    "norm_win_points": 1.6527915621874911
+  },
+  "Public Works": {
+    "prob_per_card_ssd": 0.04197948544005059,
+    "win_points": 1.4,
+    "prob_per_card": 0.16129032258064516,
+    "norm_win_points_ssd": 0.24724109261933527,
+    "norm_win_points": 1.095305042366481
+  },
+  "Dying Colony": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 0.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.0,
+    "norm_win_points": 0.0
+  },
+  "Alien Toy Shop": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.9890779026498325,
+    "norm_win_points": 0.9890779026498325
+  },
+  "Runaway Robots": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 2.0,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.2759287254928692,
+    "norm_win_points": 2.096161997827335
+  },
+  "Uplift Code": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 0.6666666666666666,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.5841479166265751,
+    "norm_win_points": 0.5841479166265752
+  },
+  "Empath World": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.08537774628651058,
+    "norm_win_points": 1.7594114959908436
+  },
+  "Artist Colony": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.7781302317506624,
+    "norm_win_points": 0.7781302317506624
+  },
+  "Avian Uplift Race": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.6328575053140185,
+    "norm_win_points": 0.6328575053140185
+  },
+  "Trade League": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.7765696872476284,
+    "norm_win_points": 0.7765696872476284
+  },
+  "Merchant World": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 0.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 0.0
+  },
+  "Free Trade Association": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.8370168748521657,
+    "norm_win_points": 0.8370168748521657
+  },
+  "New Survivalists": {
+    "prob_per_card_ssd": 0.06021009840370212,
+    "win_points": 1.0,
+    "prob_per_card": 0.12903225806451613,
+    "norm_win_points_ssd": 0.4690243430744314,
+    "norm_win_points": 0.8115769354508022
+  },
+  "Separatist Colony": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.5722739920988777
+  },
+  "Lost Species Ark World": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.7538010116392302,
+    "norm_win_points": 0.7538010116392302
+  },
+  "Interstellar Prospectors": {
+    "prob_per_card_ssd": 0.06605856502852811,
+    "win_points": 1.6,
+    "prob_per_card": 0.16129032258064516,
+    "norm_win_points_ssd": 0.3246845498690255,
+    "norm_win_points": 1.268429594652965
+  },
+  "Hive World": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.8762218749398627,
+    "norm_win_points": 0.8762218749398627
+  },
+  "Clandestine Uplift Lab": {
+    "prob_per_card_ssd": 0.06021009840370212,
+    "win_points": 1.0,
+    "prob_per_card": 0.12903225806451613,
+    "norm_win_points_ssd": 0.49692168391564595,
+    "norm_win_points": 0.8604028092456509
+  },
+  "Bio-hazard Mining World": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.3954734263493856,
+    "norm_win_points": 2.891167635467336
+  },
+  "Deserted Alien Outpost": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.799271347406754
+  },
+  "Space Mercenaries": {
+    "prob_per_card_ssd": 0.035479140730972566,
+    "win_points": 1.3333333333333333,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.36529180101508196,
+    "norm_win_points": 1.1413845098368058
+  },
+  "Space Port": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.8447892422773555
+  },
+  "Prosperous World": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.6740337497043314
+  },
+  "Mercenary Fleet": {
+    "prob_per_card_ssd": 0.033029282514264055,
+    "win_points": 0.8,
+    "prob_per_card": 0.08064516129032258,
+    "norm_win_points_ssd": 0.43311845276529526,
+    "norm_win_points": 0.7061815319345545
+  },
+  "Genetics Lab": {
+    "prob_per_card_ssd": 0.026550157798487146,
+    "win_points": 1.3333333333333333,
+    "prob_per_card": 0.04838709677419355,
+    "norm_win_points_ssd": 0.5704453845077816,
+    "norm_win_points": 1.1316860439722367
+  },
+  "New Galactic Order": {
+    "prob_per_card_ssd": 0.06605856502852811,
+    "win_points": 1.6,
+    "prob_per_card": 0.16129032258064516,
+    "norm_win_points_ssd": 0.3590569929195149,
+    "norm_win_points": 1.417391834112475
+  },
+  "Rebel Sympathizers": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.39942415241356577,
+    "norm_win_points": 1.6651391630416033
+  },
+  "Replicant Robots": {
+    "prob_per_card_ssd": 0.035479140730972566,
+    "win_points": 1.3333333333333333,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.34713993593576314,
+    "norm_win_points": 1.089959672002762
+  },
+  "Earths Lost Colony": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.5562604635013249
+  },
+  "Alien Robot Sentry": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 2.0,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 1.0323416880877434,
+    "norm_win_points": 1.713350870394497
+  },
+  "Galactic Imperium": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 2.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.18769791417614545,
+    "norm_win_points": 1.8768654012790238
+  },
+  "Prospecting Guild": {
+    "prob_per_card_ssd": 0.06021009840370212,
+    "win_points": 2.5,
+    "prob_per_card": 0.12903225806451613,
+    "norm_win_points_ssd": 0.4902842680235804,
+    "norm_win_points": 2.364780977129418
+  },
+  "Rebel Fuel Cache": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 0.9602506280069388,
+    "norm_win_points": 0.9602506280069388
+  },
+  "Alien Robotic Factory": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.8447892422773555
+  },
+  "Consumer Markets": {
+    "prob_per_card_ssd": 0.01586675409154725,
+    "win_points": 0.0,
+    "prob_per_card": 0.016129032258064516,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 0.0
+  },
+  "Rebel Homeworld": {
+    "prob_per_card_ssd": 0.06605856502852811,
+    "win_points": 1.2,
+    "prob_per_card": 0.16129032258064516,
+    "norm_win_points_ssd": 0.49488064958563194,
+    "norm_win_points": 1.1448631852816242
+  },
+  "New Economy": {
+    "prob_per_card_ssd": 0.06021009840370212,
+    "win_points": 2.5,
+    "prob_per_card": 0.12903225806451613,
+    "norm_win_points_ssd": 0.5141646361079192,
+    "norm_win_points": 2.0276686753222193
+  },
+  "Rebel Warrior Race": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 1.3333333333333333,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.7285159949763542,
+    "norm_win_points": 1.35598940040561
+  },
+  "Galactic Resort": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 1.799271347406754
+  },
+  "Primitive Rebel World": {
+    "prob_per_card_ssd": 0.07095828146194513,
+    "win_points": 1.6666666666666667,
+    "prob_per_card": 0.1935483870967742,
+    "norm_win_points_ssd": 0.44114748461212927,
+    "norm_win_points": 1.7525960748689116
+  },
+  "Interstellar Bank": {
+    "prob_per_card_ssd": 0.04431343256996376,
+    "win_points": 1.6923076923076923,
+    "prob_per_card": 0.20967741935483872,
+    "norm_win_points_ssd": 0.2910745891611693,
+    "norm_win_points": 1.5437289699717627
+  },
+  "Galactic Salon": {
+    "prob_per_card_ssd": 0.03754759324176631,
+    "win_points": 1.7142857142857142,
+    "prob_per_card": 0.11290322580645161,
+    "norm_win_points_ssd": 0.3310764929878686,
+    "norm_win_points": 1.7949903438139
+  },
+  "Rebel Colony": {
+    "prob_per_card_ssd": 0.05310031559697429,
+    "win_points": 0.6666666666666666,
+    "prob_per_card": 0.0967741935483871,
+    "norm_win_points_ssd": 0.5630558290342927,
+    "norm_win_points": 0.5630558290342927
+  },
+  "Galactic Federation": {
+    "prob_per_card_ssd": 0.07095828146194513,
+    "win_points": 1.3333333333333333,
+    "prob_per_card": 0.1935483870967742,
+    "norm_win_points_ssd": 0.3522842317950372,
+    "norm_win_points": 1.0805631162518368
+  },
+  "Rebel Miners": {
+    "prob_per_card_ssd": 0.0317335081830945,
+    "win_points": 2.0,
+    "prob_per_card": 0.03225806451612903,
+    "norm_win_points_ssd": 100000.0,
+    "norm_win_points": 2.0645633154551692
+  },
+  "Mining Conglomerate": {
+    "prob_per_card_ssd": 0.033029282514264055,
+    "win_points": 1.6,
+    "prob_per_card": 0.08064516129032258,
+    "norm_win_points_ssd": 0.40352119750159415,
+    "norm_win_points": 1.4317908051301849
+  },
+  "Gem Smugglers": {
+    "prob_per_card_ssd": 0.044123652543421835,
+    "win_points": 1.0,
+    "prob_per_card": 0.06451612903225806,
+    "norm_win_points_ssd": 1.6433205309083603,
+    "norm_win_points": 1.6433205309083603
+  }
+};
+  RenderCardWinInfo(cardWinInfo,document.getElementById("cardWinInfoCanvas"));
+</script>
+</p>
+<table id="homeworld_flow_tables"><tr><td><br><a name="homeworld_flow"> <table border=1><tr><td>Homeworld</td><td>Net rating change</td><td>2 Player record</td></tr><tr><td>Damaged Alien Factory</td><td>31.7</td><td><font color="green">2</font>-<font color="red">0</font>-<font color="#444444">0</font></td></tr>
+<tr><td>New Sparta</td><td>28.2</td><td><font color="green">6</font>-<font color="red">1</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Galactic Developers</td><td>10.7</td><td><font color="green">2</font>-<font color="red">0</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Imperium Warlord</td><td>8.5</td><td><font color="green">3</font>-<font color="red">2</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Epsilon Eridani</td><td>7.4</td><td><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Doomed World</td><td>6.3</td><td><font color="green">2</font>-<font color="red">1</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Separatist Colony</td><td>2.2</td><td><font color="green">2</font>-<font color="red">1</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Alpha Centauri</td><td>-1.3</td><td><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Rebel Cantina</td><td>-2.6</td><td><font color="green">1</font>-<font color="red">1</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Earths Lost Colony</td><td>-5.3</td><td><font color="green">1</font>-<font color="red">1</font>-<font color="#444444">0</font></td></tr>
+</table></td><td><br><table border=1><tr><td>Opponent Homeworld</td><td>Net flow against</td><td>2P rec against</td></tr><tr><td>Rebel Cantina</td><td>35.6</td><td><font color="green">5</font>-<font color="red">0</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Earths Lost Colony</td><td>26.5</td><td><font color="green">3</font>-<font color="red">0</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Separatist Colony</td><td>19.2</td><td><font color="green">2</font>-<font color="red">0</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Epsilon Eridani</td><td>13.2</td><td><font color="green">2</font>-<font color="red">0</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Galactic Developers</td><td>8.0</td><td><font color="green">3</font>-<font color="red">1</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Alpha Centauri</td><td>1.4</td><td><font color="green">3</font>-<font color="red">2</font>-<font color="#444444">0</font></td></tr>
+<tr><td>New Sparta</td><td>-0.3</td><td><font color="green">1</font>-<font color="red">1</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Ancient Race</td><td>-7.1</td><td><font color="green">1</font>-<font color="red">2</font>-<font color="#444444">0</font></td></tr>
+<tr><td>Imperium Warlord</td><td>-10.6</td><td><font color="green">1</font>-<font color="red">1</font>-<font color="#444444">0</font></td></tr>
+</table></table><a name="player_flow"> <table border=1><tr><td>Opponent</td><td>Net rating flow</td><td>Record</td></tr>
+<tr><td rowspan=1><a href="player_Deliverance.html">Deliverance </a></td><td rowspan=1>11.4</td><td rowspan=1><font color="green">5</font>-<font color="red">2</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/6698"><font color="red">ELC-57 NS-65</font></a></td><td><a href="http://flexboardgames.com/games/6690"><font color="green">GD-75 AC-35</font></a></td><td><a href="http://flexboardgames.com/games/6530"><font color="red">RC-48 IW-52</font></a></td><td><a href="http://flexboardgames.com/games/6509"><font color="green">DAF-67 GD-58</font></a></td><td><a href="http://flexboardgames.com/games/6176"><font color="green">SC-59 IW-34</font></a></td><td><a href="http://flexboardgames.com/games/6142"><font color="green">NS-71 RC-41</font></a></td><td><a href="http://flexboardgames.com/games/5994"><font color="green">DAF-54 RC-25</font></a></td></tr>
+<tr><td rowspan=1><a href="player_dejnor.html">dejnor </a></td><td rowspan=1>10.4</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/5961"><font color="green">DW-55 ELC-39</font></a></td></tr>
+<tr><td rowspan=1><a href="player_SevenSpirits.html">SevenSpirits </a></td><td rowspan=1>9.3</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/11738"><font color="green">SC-32 ELC-30</font></a></td></tr>
+<tr><td rowspan=1><a href="player_semeai.html">semeai </a></td><td rowspan=1>9.0</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/6197"><font color="green">IW-62 NS-44</font></a></td></tr>
+<tr><td rowspan=1><a href="player_raistlin.html">raistlin </a></td><td rowspan=1>7.7</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/10385"><font color="green">NS-65 EE-57</font></a></td></tr>
+<tr><td rowspan=1><a href="player_r0b0t0.html">r0b0t0 </a></td><td rowspan=1>7.5</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/5994"><font color="green">DAF-54 NS-20</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Langoroth.html">Langoroth </a></td><td rowspan=1>7.4</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/5848"><font color="green">EE-65 SC-44</font></a></td></tr>
+<tr><td rowspan=1><a href="player_GuySrinivasan.html">GuySrinivasan (Guy+Srinivasan)</a></td><td rowspan=1>7.2</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/7621"><font color="green">IW-44 AR-33</font></a></td></tr>
+<tr><td rowspan=1><a href="player_yakman.html">yakman </a></td><td rowspan=1>6.9</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/13647"><font color="green">RC-38 GD-34</font></a></td></tr>
+<tr><td rowspan=1><a href="player_thewie.html">thewie </a></td><td rowspan=1>6.8</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/6680"><font color="green">NS-44 ELC-36</font></a></td></tr>
+<tr><td rowspan=1><a href="player_jaxgelthra.html">jaxgelthra </a></td><td rowspan=1>6.7</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/6544"><font color="green">IW-44 RC-26</font></a></td></tr>
+<tr><td rowspan=1><a href="player_DDeicide.html">DDeicide </a></td><td rowspan=1>6.4</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/6394"><font color="green">NS-61 RC-42</font></a></td></tr>
+<tr><td rowspan=1><a href="player_noloplain.html">noloplain </a></td><td rowspan=1>6.1</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/7908"><font color="green">AC-65 SC-51</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Menocu.html">Menocu </a></td><td rowspan=1>6.0</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/6253"><font color="green">DAF-52 AC-35</font></a></td></tr>
+<tr><td rowspan=1><a href="player_xthread.html">xthread </a></td><td rowspan=1>5.7</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/5994"><font color="green">DAF-54 SC-26</font></a></td></tr>
+<tr><td rowspan=1><a href="player_brown1204.html">brown1204 </a></td><td rowspan=1>5.5</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/10028"><font color="green">NS-58 EE-24</font></a></td></tr>
+<tr><td rowspan=1><a href="player_DLPJR.html">DLPJR </a></td><td rowspan=1>5.4</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/13379"><font color="green">GD-57 RC-34</font></a></td></tr>
+<tr><td rowspan=1><a href="player_benlehman.html">benlehman </a></td><td rowspan=1>5.1</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/6552"><font color="green">DW-63 GD-25</font></a></td></tr>
+<tr><td rowspan=1><a href="player_timelf.html">timelf </a></td><td rowspan=1>4.5</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/10842"><font color="green">ELC-50 AC-31</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Morgoth.html">Morgoth </a></td><td rowspan=1>3.1</td><td rowspan=1><font color="green">1</font>-<font color="red">0</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/7876"><font color="green">NS-51 RC-32</font></a></td></tr>
+<tr><td rowspan=1><a href="player_MrWeasely.html">MrWeasely </a></td><td rowspan=1>-5.1</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/5691"><font color="red">IW-58 AR-63</font></a></td></tr>
+<tr><td rowspan=1><a href="player_Meddler.html">Meddler </a></td><td rowspan=1>-6.3</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/5687"><font color="red">SC-46 AC-61</font></a></td></tr>
+<tr><td rowspan=1><a href="player_archivists.html">archivists </a></td><td rowspan=1>-7.0</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/5954"><font color="red">SC-31 NS-48</font></a></td></tr>
+<tr><td rowspan=1><a href="player_WishMark.html">WishMark </a></td><td rowspan=1>-7.3</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/5790"><font color="red">AC-40 IW-55</font></a></td></tr>
+<tr><td rowspan=1><a href="player_SprintfortheUniverse.html">SprintfortheUniverse </a></td><td rowspan=1>-8.2</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/13375"><font color="red">NS-42 AC-46</font></a></td></tr>
+<tr><td rowspan=1><a href="player_supergreen.html">supergreen </a></td><td rowspan=1>-9.2</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/12905"><font color="red">DW-50 GD-54</font></a></td></tr>
+<tr><td rowspan=1><a href="player_mbear.html">mbear </a></td><td rowspan=1>-9.2</td><td rowspan=1><font color="green">0</font>-<font color="red">1</font>-<font color="#444444">0</font></td><td><a href="http://flexboardgames.com/games/11733"><font color="red">IW-62 AR-68</font></a></td></tr>
+</table></html>
